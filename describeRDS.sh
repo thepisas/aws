@@ -14,10 +14,10 @@ output_file=${output_dir}/rds.csv
 source ./unsetTempCred.sh
 
 #get and set temporary credentials when MFA is in use ; this by default expires in 12 hours
-source ./MFA.sh ${mfa_code}  
+source ../MFA.sh ${mfa_code}  
 
 
-echo '"Instance Identifier","DB Engine",DBInstanceClass,AllocatedStorage,Encryption,MultiAZ,Endpoint,Environment' > ${output_dir}
-#aws rds describe-db-instances --output text --query 'DBInstances[*].[DBInstanceIdentifier,Engine,DBInstanceClass,AllocatedStorage,StorageEncrypted,MultiAZ,Endpoint.Address,Endpoint.Port,DBName]' >> ${output_dir}
-aws rds describe-db-instances | jq -r '.DBInstances[] | [.DBInstanceIdentifier,.Engine,.DBInstanceClass,.AllocatedStorage,.StorageEncrypted,.MultiAZ,.Endpoint.Address +" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName] |@csv' | sort -b -k1 >> ${output_dir}
-echo "The output is in ${output_dir}"
+echo '"Instance Identifier","DB Engine",DBInstanceClass,AllocatedStorage,Encryption,MultiAZ,Endpoint,Environment' > ${output_file}
+#aws rds describe-db-instances --output text --query 'DBInstances[*].[DBInstanceIdentifier,Engine,DBInstanceClass,AllocatedStorage,StorageEncrypted,MultiAZ,Endpoint.Address,Endpoint.Port,DBName]' >> ${output_file}
+aws rds describe-db-instances | jq -r '.DBInstances[] | [.DBInstanceIdentifier,.Engine,.DBInstanceClass,.AllocatedStorage,.StorageEncrypted,.MultiAZ,.Endpoint.Address +" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName] |@csv' | sort -b -k1 >> ${output_file}
+echo "The output is in ${output_file}"

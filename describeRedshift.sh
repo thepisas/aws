@@ -14,9 +14,11 @@ output_file=${output_dir}/redshift.csv
 source ./unsetTempCred.sh
 
 #get and set temporary credentials when MFA is in use ; this by default expires in 12 hours
-source ./MFA.sh ${mfa_code}  
+source ../MFA.sh ${mfa_code}  
 
 
-echo '"Cluster Name","Number of Nodes","Node Type",VpcId,AvailabilityZone,EnhancedVpcRouting,Encryption,Endpoint,Roles,Environment' > ${output_dir}
-aws redshift describe-clusters | jq -r '.Clusters[]|[.ClusterIdentifier,.NumberOfNodes,.NodeType,.VpcId,.AvailabilityZone,.EnhancedVpcRouting,.Encrypted,.Endpoint.Address+" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName,"\"" + (.IamRoles[].IamRoleArn) + "\""] |@csv'| sort -b -k1 >> ${output_dir}
-echo "The output is in ${output_dir}"
+echo '"Cluster Name","Number of Nodes","Node Type",VpcId,AvailabilityZone,EnhancedVpcRouting,Encryption,Endpoint,Roles,Environment' > ${output_file}
+#aws redshift describe-clusters | jq -r '.Clusters[]|[.ClusterIdentifier,.NumberOfNodes,.NodeType,.VpcId,.AvailabilityZone,.EnhancedVpcRouting,.Encrypted,.Endpoint.Address+" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName,"\"" + (.IamRoles[].IamRoleArn) + "\""] |@csv'| sort -b -k1 >> ${output_file}
+#aws redshift describe-clusters | jq -r '.Clusters[]|[.ClusterIdentifier,.NumberOfNodes,.NodeType,.VpcId,.AvailabilityZone,.EnhancedVpcRouting,.Encrypted,.Endpoint.Address+" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName,.IamRoles[].IamRoleArn] |@csv'| sort -b -k1 >> ${output_file}
+aws redshift describe-clusters | jq -r '.Clusters[]|[.ClusterIdentifier,.NumberOfNodes,.NodeType,.VpcId,.AvailabilityZone,.EnhancedVpcRouting,.Encrypted,.Endpoint.Address+" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName,.IamRoles[0].IamRoleArn + " , " + .IamRoles[1].IamRoleArn] |@csv'| sort -b -k1 >> ${output_file}
+echo "The output is in ${output_file}"

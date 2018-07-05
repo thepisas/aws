@@ -13,13 +13,13 @@ output_dir=../output
 source ./unsetTempCred.sh
 
 #get and set temporary credentials when MFA is in use ; this by default expires in 12 hours
-source ./MFA.sh ${mfa_code}  
+source ../MFA.sh ${mfa_code}  
 
 output_file=${output_dir}/ec2.csv
 
 #aws ec2 describe-instances --output text --query 'Reservations[*].Instances[*].[InstanceId, InstanceType,State.Name, LaunchTime, Placement.AvailabilityZone, Placement.Tenancy, PrivateIpAddress, PrivateDnsName, PublicDnsName, [Tags[?Key==`Name`].Value] [0][0], [Tags[?Key==`purpose`].Value] [0][0], [Tags[?Key==`environment`].Value] [0][0], [Tags[?Key==`team`].Value] [0][0] ]' > instances.csv
 #aws ec2 describe-instances --query 'Reservations[*].Instances[*].[[Tags[?Key==`Name`].Value] [0][0],InstanceId, InstanceType,Placement.AvailabilityZone,PrivateIpAddress, PublicDnsName, [Tags[?Key==`OS`].Value] [0][0],[Tags[?Key==`Application`].Value] [0][0],[Tags[?Key==`Environment`].Value] [0][0],State.Name]' > instances.json
-echo "Name,InstanceId,InstanceType,AvailabilityZone,PrivateIpAddress,OperatingSystem,Tag,Environment,State" > ${output_dir}
-aws ec2 describe-instances --output text  --query 'Reservations[*].Instances[*].[[Tags[?Key==`Name`].Value] [0][0],InstanceId, InstanceType,Placement.AvailabilityZone,PrivateIpAddress, [Tags[?Key==`OS`].Value] [0][0],[Tags[?Key==`Application`].Value] [0][0],[Tags[?Key==`Environment`].Value] [0][0],State.Name]' | sed -e 's/\t/,/g' | sort -t, -k7 -k8 -k6 -k1  >> ${output_dir}
+echo "Name,InstanceId,InstanceType,AvailabilityZone,PrivateIpAddress,OperatingSystem,Tag,Environment,State" > ${output_file}
+aws ec2 describe-instances --output text  --query 'Reservations[*].Instances[*].[[Tags[?Key==`Name`].Value] [0][0],InstanceId, InstanceType,Placement.AvailabilityZone,PrivateIpAddress, [Tags[?Key==`OS`].Value] [0][0],[Tags[?Key==`Application`].Value] [0][0],[Tags[?Key==`Environment`].Value] [0][0],State.Name]' | sed -e 's/\t/,/g' | sort -t, -k7 -k8 -k6 -k1  >> ${output_file}
 
-echo "The output is in ${output_dir}"
+echo "The output is in ${output_file}"
