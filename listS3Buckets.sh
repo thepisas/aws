@@ -7,14 +7,14 @@ if [ $# -ne 1 ];then
 fi
 
 mfa_code=${1}
-output_file=S3.csv
+output_dir=../output
+output_file=${output_dir}/S3.csv
 
 #unset the temp credentials (variables) set by MFA.sh during a previous run ; if not when you call MFA.sh,   the "aws sts get-session-token" call will be invoked with  your temp credentials  that was set by a previous run of MFA.sh , as oppossed to your permanent AWS cred and thus will error out  with "An error occurred (AccessDenied) when calling the GetSessionToken operation: Cannot call GetSessionToken with session credentials"
 source ./unsetTempCred.sh
 
 #get and set temporary credentials when MFA is in use ; this by default expires in 12 hours
-source ./MFA.sh ${mfa_code}  
-
+source ../MFA.sh ${mfa_code}  
 
 echo '"S3 BucketName"' > ${output_file}
 aws s3 ls | awk '{print $NF}' | sort -k1 >> ${output_file}
