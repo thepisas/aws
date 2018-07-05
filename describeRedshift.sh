@@ -8,7 +8,7 @@ fi
 
 mfa_code=${1}
 output_dir=../output
-output_file=${output_dir}/redshift.csv
+output_file=${output_dir}/Redshift.csv
 
 #unset the temp credentials (variables) set by MFA.sh during a previous run ; if not when you call MFA.sh,   the "aws sts get-session-token" call will be invoked with  your temp credentials  that was set by a previous run of MFA.sh , as oppossed to your permanent AWS cred and thus will error out  with "An error occurred (AccessDenied) when calling the GetSessionToken operation: Cannot call GetSessionToken with session credentials"
 source ./unsetTempCred.sh
