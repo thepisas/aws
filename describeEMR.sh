@@ -18,7 +18,7 @@ source ./unsetTempCred.sh
 source ../MFA.sh ${mfa_code}  
 
 
-echo '"Cluster Name","Number of Nodes","Node Type",VpcId,AvailabilityZone,EnhancedVpcRouting,Encryption,Endpoint,Roles,Environment' > ${output_file}
+echo '"Cluster Name","Number of Nodes","Node Type",VpcId,AvailabilityZone,EnhancedVpcRouting,Encryption,Endpoint,Environment' > ${output_file}
 #aws redshift describe-clusters | jq -r '.Clusters[]|[.ClusterIdentifier,.NumberOfNodes,.NodeType,.VpcId,.AvailabilityZone,.EnhancedVpcRouting,.Encrypted,.Endpoint.Address+" , port: "+(.Endpoint.Port|tostring) +" , dbname: "+.DBName,.IamRoles[0].IamRoleArn + " , " + .IamRoles[1].IamRoleArn] |@csv'| sort -b -k1 >> ${output_file}
 for i in `aws emr list-clusters --output text --query 'Clusters[0].Id'` ; do aws emr describe-cluster --cluster-id $i|jq -r '.Cluster.Name,.Cluster.InstanceGroups[].InstanceGroupType,.Cluster.InstanceGroups[].EbsBlockDevices[].VolumeSpecification.SizeInGB,.Cluster.InstanceGroups[].InstanceType,.Cluster.MasterPublicDnsName'; done
 echo "The output is in ${output_file}"
