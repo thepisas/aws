@@ -2,7 +2,7 @@
 # displays information about all ec2_instances
 
 if [ $# -ne 1 ];then
-  echo -e "usage: . $0 <mfa_code_from_your_device>"
+  echo -e "usage: . ${BASH_SOURCE[0]} <mfa_code_from_your_device>"
   exit 1
 fi
 
