@@ -4,4 +4,9 @@ aws ecs list-container-instances --cluster ecs-dev #cluster-name
 
 #to get info about container ec2 instances
 aws ecs describe-container-instances --cluster ecs-dev --container-instances <arn_of_ec2_instance which you can get from the command above>
+
+aws ecs list-task-definition-families
 aws ecs list-task-definitions
+aws ecs describe-task-definition --task-definition ktdev-app #task-name, by default provides the latest version
+
+aws ecs list-services --cluster ecs-dev #cluster-name
