@@ -1,0 +1,2 @@
+aws lambda list-functions | jq -r '.Functions[0]'
+aws lambda get-policy --function-name qa-edh-delete-from-error-index | jq -r '.'
