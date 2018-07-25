@@ -1,0 +1,5 @@
+#dev redshift
+psql -h amzlrsedhd01.c487lejaem9e.us-east-1.redshift.amazonaws.com -U master -d dev -p 5439
+
+#qa redshift
+psql -h amzlrsedhq01.c487lejaem9e.us-east-1.redshift.amazonaws.com -U master -d qa -p 5439
