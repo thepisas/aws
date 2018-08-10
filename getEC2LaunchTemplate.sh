@@ -1,13 +1,14 @@
 #!/bin/bash
 # get launch template from existing instance
 
-if [ $# -ne 2 ];then
-  echo -e "usage: . ${BASH_SOURCE[0]} <mfa_code_from_your_device> <ec2-instance-id>"
+if [ $# -ne 3 ];then
+  echo -e "usage: . ${BASH_SOURCE[0]} <mfa_code_from_your_device> <iam_profile> <ec2-instance-id>"
   return 1 #using return here , instead of exit as the appropriate invocation of this script is "source ${BASH_SOURCE[0]} or . ${BASH_SOURCE[0]}" . Doing so causes the script to be executed in the current shell (instead of in another spawned shell) ; thereby the variables(temporary credentials) set in ../MFA.sh are available to you even in your current shell even after this script has ended. So after executing this script, from the same shell prompt you can subsequently run other aws commands withouth having to set the temporary credentials again. If you don't use source  (or .) , and instead simply execute this script as ${BASH_SOURCE[0]} , then a new shell will be spawned and this script will be run in that shell and so the variables set are not available to you after the script has ended .  Getting back to using return vs exit here , since  a new shell is not spawned when you use . , if you use exit here, you will lose your terminal . Normally return is used to return from a function, but in this use case, you use it to return from the executing script .
 fi
 
 mfa_code=${1}
-instance_id=${2}
+profile=${2}
+instance_id=${3}
 output_dir=../output
 #output_file=${output_dir}/ec2.csv
 #replaces listString.sh or describeString.sh to String.$instance_id.json
@@ -17,7 +18,7 @@ output_file=${output_dir}/`echo "${BASH_SOURCE[0]}"|perl -s -p -e 's~.*(list|des
 source ./unsetTempCred.sh
 
 #get and set temporary credentials when MFA is in use ; this by default expires in 12 hours
-source ../MFA.sh ${mfa_code}  
+source ../MFA.sh ${mfa_code} ${profile} 
 
 
 #you need to exclude LaunchTemplateData from your json, if you are going to be using json_string "aws ec2 create-launch-template --launch-template-name poc --launch-template-data '${json_string}'" 
