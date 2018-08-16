@@ -1,0 +1,158 @@
+amzrsrfq01  code
+===============
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Description": "A template of RedShift Cluster, create in an existing VPC & Public subnet",
+  "Parameters": {
+    "Environment" : {
+        "Description" : "The name of the first database to be created when the cluster is created",
+        "Type" : "String",
+        "Default" : "QA"
+      },
+    "Application" : {
+        "Description" : "The name of the first database to be created when the cluster is created",
+        "Type" : "String",
+        "Default" : "RF"
+      },
+    "DatabaseName" : {
+      "Description" : "The name of the first database to be created when the cluster is created",
+      "Type" : "String",
+      "Default" : "qa",
+      "AllowedPattern" : "([a-z]|[0-9])+"
+    },
+    "ClusterId": {
+        "Description" : "The cluster id",
+        "Type" : "String",
+        "Default" : "amzrsrfq01"
+      },
+    "ClusterType" : {
+      "Description" : "The type of cluster",
+      "Type" : "String",
+      "Default" : "multi-node",
+      "AllowedValues" : [ "single-node", "multi-node" ]
+    },
+    "NumberOfNodes" : {
+      "Description" : "The number of compute nodes in the cluster. For multi-node clusters, the NumberOfNodes parameter must be greater than 1",
+      "Type" : "Number",
+      "Default" : "6"
+    },
+    "NodeType" : {
+      "Description" : "The type of node to be provisioned",
+      "Type" : "String",
+      "Default" : "ds2.xlarge",
+      "AllowedValues" : [ "ds2.xlarge", "ds2.8xlarge", "dc1.large", "dc1.8xlarge" ]
+    },
+    "MasterUsername" : {
+      "Description" : "The user name that is associated with the master user account for the cluster that is being created",
+      "Type" : "String",
+      "Default" : "master",
+      "AllowedPattern" : "([a-z])([a-z]|[0-9])*"
+    },
+    "MasterUserPassword" :  {
+      "Description" : "The password that is associated with the master user account for the cluster that is being created.",
+      "Type" : "String",
+      "NoEcho" : "true"
+    },
+    "RedshiftClusterParameterGroup" : {
+        "Description" : "Redshift Cluster Parameter Group",
+        "Type" : "String",
+        "Default" : "wlm-qa"
+    },
+    "RedshiftClusterSubnetGroup" : {
+        "Description" : "Redshift Cluster subnet Group",
+        "Type" : "String",
+        "Default" : "qa-edh-tco-rshift-csg"
+    },
+    "PortNumber" : {
+        "Description" : "The port number on which the cluster accepts incoming connections.",
+        "Type" : "Number",
+        "Default" : "5439"
+      },
+    "VPCId" : {
+        "Description" : "Existing VPC hosting the cluster",
+        "Type" : "AWS::EC2::VPC::Id",
+        "Default": "vpc-6057bd06"
+      },
+    "PreferedAZ": {
+        "Description" : "Prefered Avalability Zone",
+        "Type" : "AWS::EC2::AvailabilityZone::Name",
+        "Default": "us-east-1b"
+    },
+    "SubnetId" : {
+        "Description" : "Existing Subnet inside the VPC hosting the cluster",
+        "Type" : "AWS::EC2::Subnet::Id",
+        "Default": "subnet-0dad1c20"
+      },
+    "SecurityGroupId": {
+        "Description" : "Existing SecurityGroup for the cluster",
+        "Type" : "AWS::EC2::SecurityGroup::Id",
+        "Default": "sg-a0b8bbdc"
+      },
+    "KmsKeyArn": {
+        "Description" : "kms key",
+        "Type" : "String",
+        "Default": "arn:aws:kms:us-east-1:869052972610:key/a1097040-6bec-4d98-a31e-278e4b5db7ee"
+    },
+    "IamRoleArn1": {
+        "Description" : "IamRoleArn1",
+        "Type" : "String",
+        "Default": "arn:aws:iam::869052972610:role/RedshiftRole"
+    },
+    "IamRoleArn2": {
+        "Description" : "IamRoleArn2",
+        "Type" : "String",
+        "Default": "arn:aws:iam::869052972610:role/RsQAS3"
+    }
+  },
+
+  "Resources" : {
+    "RedshiftCluster" : {
+      "Type" : "AWS::Redshift::Cluster",
+      "Properties" : {
+        "DBName" : { "Ref" : "DatabaseName" },
+        "ClusterIdentifier": { "Ref" : "ClusterId" },
+        "ClusterType" : { "Ref" : "ClusterType" },
+        "NodeType" : { "Ref" : "NodeType" },
+        "MasterUsername" : { "Ref" : "MasterUsername" },
+        "MasterUserPassword" : { "Ref" : "MasterUserPassword" },
+        "VpcSecurityGroupIds" : [ { "Ref" : "SecurityGroupId" } ],
+        "ClusterSubnetGroupName" : { "Ref" : "RedshiftClusterSubnetGroup" },
+        "AvailabilityZone": {"Ref": "PreferedAZ"},
+        "PreferredMaintenanceWindow": "sun:07:00-sun:08:00",
+        "ClusterParameterGroupName" : { "Ref" : "RedshiftClusterParameterGroup" },
+        "AutomatedSnapshotRetentionPeriod": 35,
+        "Port" : { "Ref" : "PortNumber" },
+        "ClusterVersion": "1.0",
+        "AllowVersionUpgrade": "true",
+        "NumberOfNodes": {"Ref": "NumberOfNodes"},
+        "PubliclyAccessible" : "false",
+        "Encrypted": true,
+        "Tags": [
+            {
+              "Key": "Environment",
+              "Value": {"Ref": "Environment"}
+            },{
+              "Key": "Application",
+              "Value": {"Ref": "Application"}
+            }
+          ],
+        "KmsKeyId": {"Ref": "KmsKeyArn"},
+        "IamRoles": [
+            {"Ref": "IamRoleArn1"},
+            {"Ref": "IamRoleArn2"}
+        ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "ClusterEndpoint" : {
+      "Description" : "Cluster endpoint",
+      "Value" : { "Fn::Join" : [ ":", [ { "Fn::GetAtt" : [ "RedshiftCluster", "Endpoint.Address" ] }, { "Fn::GetAtt" : [ "RedshiftCluster", "Endpoint.Port" ] } ] ] }
+    },
+    "ClusterName" : {
+      "Description" : "Name of cluster",
+      "Value" : { "Ref" : "RedshiftCluster" }
+    }
+  }
+}
