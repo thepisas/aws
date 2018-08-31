@@ -15,8 +15,8 @@ instance_type=${4}
 app=rf
 #App=`echo ${app} |sed 's/[^ ]\+/\L\u&/g'`  #converts to camelcase ; strictly speaking you don't need \L here
 App=`echo ${app} |sed 's/.*/\u&/g'`  #converts to camelcase 
-#instance_termination_protection=--disable-api-termination
-instance_termination_protection=--enable-api-termination
+instance_termination_protection=--disable-api-termination
+#instance_termination_protection=--enable-api-termination
 instance_initiated_shutdown_behavior=stop  #default 
 OS=RedHatLinux
 daily_snapshot=True
@@ -40,28 +40,36 @@ case "$environment" in
     ;;
 esac
 
-hostname=poc-amz${software}${app}${env}01
 
 if [ "${software}" = "bdm" ];then
    #image_id=ami-fd2d3082
-   image_id=ami-0fa2a2cb82b898c4b
+   #image_id=ami-0fa2a2cb82b898c4b
+   image_id=ami-0ea49c4d86d419bb4
    if [ "${env}" = "dev" ];then
       key_name=EDH-TCO-INF
    elif [ "${env}" = "qa" ];then
       key_name=EDH-TCO-INF-QA
    fi
    security_group_ids="sg-b503cac9 sg-8b0e84f7 sg-07ed537a sg-9a579ce5"
-   block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=128,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=500,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}'"
+   #block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=128,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=500,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}'"
+   block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=128,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=500,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdc,Ebs={VolumeSize=1600,VolumeType=st1,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f\"}'"
+   hostname=poc-amz${software}${app}${env}01
    tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${environment}},{Key=Application,Value=${app}},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}}]'" 
    iam_instance_profile_name=Ec2${Software}${App}${Env}Role
 elif [ "${software}" = "els" ] || [ "${software}" = "kib" ];then
    image_id=ami-0e524e75
    key_name="ELASTIC${env^^}"
-   security_group_ids="sg-67889f17 sg-9a579ce5"
+   if [ "${environment}" = "dev" ];then
+      security_group_ids="sg-67889f17 sg-9a579ce5"
+   elif [ "${environment}" = "qa" ];then
+      security_group_ids="sg-fc911f8f sg-9a579ce5"
+   fi
    if [ "${node}" = "els-slave" ];then
-       block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}'"
+       block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f\"}'"
+       hostname=poc-amz${software}${app}${env}02  #if you are creating multiple slave nodes, rename them 03 ,04 post creation . TODO :make this dynamic later
    else  #elastic master and kibana node
-       block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=50,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}'"
+       block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=50,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f\"}'"
+       hostname=poc-amz${software}${app}${env}01
    fi
    tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${environment}},{Key=Application,Value=${app}2},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}},{Key=clustername,Value=elasticsearch${app}-${env}}]'" 
    iam_instance_profile_name=Ec2Els${App}${Env}Role

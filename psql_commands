@@ -1,7 +1,13 @@
 #dev redshift
 psql -h amzlrsedhd01.c487lejaem9e.us-east-1.redshift.amazonaws.com -U master -d dev -p 5439
 
+psql -h amzredrfdev01.c487lejaem9e.us-east-1.redshift.amazonaws.com -U master -d dev -p 5439
+
 #qa redshift
 psql -h amzlrsedhq01.c487lejaem9e.us-east-1.redshift.amazonaws.com -U master -d qa -p 5439
 
+psql -h amzredrfqa01.c487lejaem9e.us-east-1.redshift.amazonaws.com:5439 -U master -d qa -p 5439
+
 psql -h amzlrsedhp01.cuidcbmn3pss.us-east-1.redshift.amazonaws.com -U master -d prod -p 5439
+
+

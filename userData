@@ -8,3 +8,5 @@ chmod 644 /home/apathros/.ssh/authorized_keys
 chmod 700 /home/apathros/.ssh/authorized_keys
 echo "apathros ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 yum install nvme-cli -y
+#hostnamectl set-hostname --static ${hostname} ; reboot
+
