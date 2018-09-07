@@ -1,0 +1,55 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Parameters": {
+        "IamUserName": {
+            "Description": "IAM user name that will have access to ECR e.g. svc_ecr_push_posrf_dev ",
+            "Type": "String"
+        },
+        "RepositoryName": {
+            "Description": "E.g. amzecr_posrf_dev/bucketstorageapi",
+            "Type": "String"
+        }
+    },
+    "Resources": {
+        "BucketStorageApiRepository": {
+            "Type": "AWS::ECR::Repository",
+            "Properties": {
+                "RepositoryName": { "Ref" : "RepositoryName" },
+                "RepositoryPolicyText": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Sid": "AllowPushPull",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "AWS": [
+                                    {
+                                       "Fn::Join" : [ "", ["arn:aws:iam::",{ "Ref" : "AWS::AccountId" },":","user/",{ "Ref" : "IamUserName" }  ] ]
+                                    }
+                                ]
+                            },
+                            "Action": [
+                                "ecr:GetDownloadUrlForLayer",
+                                "ecr:BatchGetImage",
+                                "ecr:BatchCheckLayerAvailability",
+                                "ecr:PutImage",
+                                "ecr:InitiateLayerUpload",
+                                "ecr:UploadLayerPart",
+                                "ecr:CompleteLayerUpload"
+                            ]
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "BucketStorageApi": {
+            "Description": "Your BucketStorageApi Repository ARN",
+            "Value": {
+                "Fn::Join": [ "",[ { "Fn::GetAtt": [ "BucketStorageApiRepository", "Arn" ] } ] ]
+            }
+        }
+    }
+}
+
