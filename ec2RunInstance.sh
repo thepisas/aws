@@ -15,6 +15,7 @@ instance_type=${4}
 app=rf
 #App=`echo ${app} |sed 's/[^ ]\+/\L\u&/g'`  #converts to camelcase ; strictly speaking you don't need \L here
 App=`echo ${app} |sed 's/.*/\u&/g'`  #converts to camelcase 
+tag_application=${app^^}2  #convert to uppercase
 instance_termination_protection=--disable-api-termination
 #instance_termination_protection=--enable-api-termination
 instance_initiated_shutdown_behavior=stop  #default 
@@ -54,7 +55,7 @@ if [ "${software}" = "bdm" ];then
    #block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=128,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=500,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}'"
    block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=128,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=500,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdc,Ebs={VolumeSize=1600,VolumeType=st1,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f\"}'"
    hostname=poc-amz${software}${app}${env}01
-   tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${environment}},{Key=Application,Value=${app}},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}}]'" 
+   tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${environment}},{Key=Application,Value=${tag_application}},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}}]'" 
    iam_instance_profile_name=Ec2${Software}${App}${Env}Role
 elif [ "${software}" = "els" ] || [ "${software}" = "kib" ];then
    image_id=ami-0e524e75
@@ -71,7 +72,7 @@ elif [ "${software}" = "els" ] || [ "${software}" = "kib" ];then
        block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=100,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=50,VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f\"}'"
        hostname=poc-amz${software}${app}${env}01
    fi
-   tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${environment}},{Key=Application,Value=${app}2},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}},{Key=clustername,Value=elasticsearch${app}-${env}}]'" 
+   tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${environment}},{Key=Application,Value=${tag_application},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}},{Key=clustername,Value=elasticsearch${app}-${env}}]'" 
    iam_instance_profile_name=Ec2Els${App}${Env}Role
 else 
    echo "Invalid value entered for software ... exiting"
@@ -83,4 +84,4 @@ fi
 cmd="aws ec2 run-instances --image-id ${image_id} --key-name ${key_name} --iam-instance-profile Name=${iam_instance_profile_name} --subnet-id ${subnet_id} --tag-specifications ${tag_specifications} ${instance_termination_protection} --instance-initiated-shutdown-behavior ${instance_initiated_shutdown_behavior} --monitoring Enabled=${monitoring} --instance-type=${instance_type} ${placement} --security-group-ids ${security_group_ids} --ebs-optimized --block-device-mappings ${block_device_mappings} --user-data file://${user_data}" 
 
 echo "${cmd}"
-eval $cmd
+#eval $cmd
