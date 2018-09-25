@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# Update & install unzip
+
+sudo yum install unzip bind-utils traceroute lvm2 wget telnet -y
+
+yum install –y https://dl.fedoraproject.org/pub/epel/epel-release-latest-7.noarch.rpm
+
+yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+
+sudo yum update -y
+
+# Set Timezone
+
+sudo timedatectl set-timezone America/New_York
+
+# Install SSM Agent
+
+cd /tmp
+sudo yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+sudo systemctl start amazon-ssm-agent
+
+# Install NMON
+
+cd /tmp
+curl -L "http://sourceforge.net/projects/nmon/files/nmon16g_x86.tar.gz" -o nmon16g_x86.tar.gz
+tar -xvzf nmon16g_x86.tar.gz
+chmod 770 nmon16g_x86_rhel72 
+mv nmon16g_x86_rhel72 /usr/local/bin/nmon
+
+#Install AWS CLI
+
+
+curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+unzip awscli-bundle.zip
+sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+
+# Update /etc/profile
+#sudo sh -c 'echo "PATH=$PATH:/usr/local/bin" >> /etc/profile'
+#sudo sh -c 'echo "export PATH" >> /etc/profile'
+#sudo sh -c 'echo "set -o vi" >> /etc/profile'
+#source /etc/profile
+
+vi /etc/profile
+
+PATH=$PATH:/usr/local/bin
+export PATH
+set -o vi
+
+source /etc/profile
+
+
+
+# Change Hostname
+/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text >> /tmp/newhostname.txt
+
+sudo hostnamectl set-hostname `cat /tmp/newhostname.txt`
+
+
+
+# Force DNS Change 
+
+sudo sh -c 'echo "supersede domain-name-servers 172.16.124.81, 172.16.124.82;" > /etc/dhcp/dhclient.conf'
+sudo sh -c 'echo "supersede domain-search "tiffco.net";" >> /etc/dhcp/dhclient.conf'
+
+# Reboot
+sudo reboot
+
+
+# Download user creation script
+#aws s3 cp /root/mk_tco_user.sh
+#sudo chown root:root /root/mk_tco_user.sh
