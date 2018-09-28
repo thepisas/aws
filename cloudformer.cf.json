@@ -1,0 +1,1557 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "vpc6057bd06": {
+      "Type": "AWS::EC2::VPC",
+      "Properties": {
+        "CidrBlock": "10.193.32.0/19",
+        "InstanceTenancy": "default",
+        "EnableDnsSupport": "true",
+        "EnableDnsHostnames": "true",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "EDH-TCO-NONPROD"
+          }
+        ]
+      }
+    },
+    "subnet0bad1c26": {
+      "Type": "AWS::EC2::Subnet",
+      "Properties": {
+        "CidrBlock": "10.193.33.0/24",
+        "AvailabilityZone": "us-east-1b",
+        "VpcId": {
+          "Ref": "vpc6057bd06"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "DEV-EDH-TCO-INF-FE-AZ1"
+          }
+        ]
+      }
+    },
+    "instancei073861006d7f7c1ed": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "DisableApiTermination": "false",
+        "InstanceInitiatedShutdownBehavior": "stop",
+        "EbsOptimized": "true",
+        "IamInstanceProfile": "arn:aws:iam::869052972610:instance-profile/sasdev_role",
+        "ImageId": "ami-26ebbc5c",
+        "InstanceType": "r4.xlarge",
+        "KeyName": "SASDEV",
+        "Monitoring": "false",
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          },
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03"
+          },
+          {
+            "Key": "OS",
+            "Value": "RedHatLinux"
+          },
+          {
+            "Key": "Daily-Snapshot",
+            "Value": "False"
+          }
+        ],
+        "Volumes": [
+          {
+            "Device": "/dev/sdf",
+            "VolumeId": {
+              "Ref": "volumevol07ed4efd6311ed373"
+            }
+          },
+          {
+            "Device": "/dev/sdg",
+            "VolumeId": {
+              "Ref": "volumevol0c72d70cddd69d4d4"
+            }
+          },
+          {
+            "Device": "/dev/sdh",
+            "VolumeId": {
+              "Ref": "volumevol0db84fafb98fdd570"
+            }
+          }
+        ],
+        "NetworkInterfaces": [
+          {
+            "DeleteOnTermination": "true",
+            "Description": "Primary network interface",
+            "DeviceIndex": 0,
+            "SubnetId": {
+              "Ref": "subnet0bad1c26"
+            },
+            "PrivateIpAddresses": [
+              {
+                "PrivateIpAddress": "10.193.33.32",
+                "Primary": "true"
+              }
+            ],
+            "GroupSet": [
+              "sg-b503cac9",
+              {
+                "Ref": "sgSASDEVSG"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "volumevol07ed4efd6311ed373": {
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "Encrypted": true,
+        "Size": "512",
+        "VolumeType": "gp2",
+        "Tags": [
+          {
+            "Key": "manualsnapshot",
+            "Value": "true"
+          },
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          },
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03 SASBin and SW Depot"
+          }
+        ]
+      }
+    },
+    "volumevol0c72d70cddd69d4d4": {
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "Encrypted": true,
+        "Size": "512",
+        "VolumeType": "gp2",
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          },
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03 saswork"
+          }
+        ]
+      }
+    },
+    "volumevol0db84fafb98fdd570": {
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "Encrypted": true,
+        "Size": "512",
+        "VolumeType": "st1",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03 sasdata"
+          },
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          }
+        ]
+      }
+    },
+    "s3amzs3adobeanalyticsdev": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs-dev"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "AdobeAnalytics"
+          }
+        ]
+      }
+    },
+    "s3amzs3edhdev": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs/"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "EDH"
+          }
+        ]
+      }
+    },
+    "s3amzs3edhmessagingerrordev": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs/ecs"
+        },
+        "VersioningConfiguration": {
+          "Status": "Suspended"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "RF"
+          }
+        ]
+      }
+    },
+    "s3amzs3edhmessagingesrepositorydev": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs"
+        },
+        "VersioningConfiguration": {
+          "Status": "Suspended"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "EDH"
+          }
+        ]
+      }
+    },
+    "s3amzs3edhmessagingrawdev": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs/ecs"
+        },
+        "VersioningConfiguration": {
+          "Status": "Suspended"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "RF"
+          }
+        ]
+      }
+    },
+    "s3amzs3edhmessagingrefineddev": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs/ecs"
+        },
+        "VersioningConfiguration": {
+          "Status": "Suspended"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "RF"
+          }
+        ]
+      }
+    },
+    "s3amzs3edhpkg": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "Private",
+        "LoggingConfiguration": {
+          "DestinationBucketName": "amzs3edhnonprodlogs",
+          "LogFilePrefix": "s3logs/"
+        },
+        "VersioningConfiguration": {
+          "Status": "Enabled"
+        },
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "EDH"
+          }
+        ]
+      }
+    },
+    "sgSASDEVSG": {
+      "Type": "AWS::EC2::SecurityGroup",
+      "Properties": {
+        "GroupDescription": "Security Group for SAS Development Servers",
+        "VpcId": {
+          "Ref": "vpc6057bd06"
+        },
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "SAS-DEV-SG"
+          }
+        ]
+      }
+    },
+    "s3policyamzs3edhdev": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "s3amzs3edhdev"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Id": "PutObjPolicy",
+          "Statement": [
+            {
+              "Sid": "Full permissions for cross account access",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "arn:aws:iam::276654360894:root"
+              },
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhdev"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhdev/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Sid": "DenyIncorrectEncryptionHeader",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhdev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnEncryptedObjectUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhdev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "Null": {
+                  "s3:x-amz-server-side-encryption": "true"
+                }
+              }
+            },
+            {
+              "Sid": "Access-to-specific-VPCE-only",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*"
+              ],
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhdev"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhdev/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:sourceVpce": [
+                    "vpce-15c7087c",
+                    "vpce-f0834f99",
+                    "vpce-8d72bae4"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "s3policyamzs3edhmessagingerrordev": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "s3amzs3edhmessagingerrordev"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Id": "PutObjPolicy",
+          "Statement": [
+            {
+              "Sid": "DenyIncorrectEncryptionHeader",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingerrordev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnEncryptedObjectUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingerrordev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "Null": {
+                  "s3:x-amz-server-side-encryption": "true"
+                }
+              }
+            },
+            {
+              "Sid": "Access-to-specific-VPCE-only",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*"
+              ],
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingerrordev"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingerrordev/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:sourceVpce": [
+                    "vpce-15c7087c",
+                    "vpce-f0834f99",
+                    "vpce-8d72bae4"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "s3policyamzs3edhmessagingesrepositorydev": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "s3amzs3edhmessagingesrepositorydev"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Id": "PutObjPolicy",
+          "Statement": [
+            {
+              "Sid": "DenyIncorrectEncryptionHeader",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingesrepositorydev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnEncryptedObjectUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingesrepositorydev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "Null": {
+                  "s3:x-amz-server-side-encryption": "true"
+                }
+              }
+            },
+            {
+              "Sid": "Access-to-specific-VPCE-only",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*"
+              ],
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingesrepositorydev"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingesrepositorydev/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:sourceVpce": [
+                    "vpce-15c7087c",
+                    "vpce-f0834f99",
+                    "vpce-8d72bae4"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "s3policyamzs3edhmessagingrawdev": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "s3amzs3edhmessagingrawdev"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Id": "PutObjPolicy",
+          "Statement": [
+            {
+              "Sid": "DenyIncorrectEncryptionHeader",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingrawdev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnEncryptedObjectUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingrawdev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "Null": {
+                  "s3:x-amz-server-side-encryption": "true"
+                }
+              }
+            },
+            {
+              "Sid": "Access-to-specific-VPCE-only",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*"
+              ],
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingrawdev"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingrawdev/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:sourceVpce": [
+                    "vpce-15c7087c",
+                    "vpce-f0834f99",
+                    "vpce-8d72bae4"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "s3policyamzs3edhmessagingrefineddev": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "s3amzs3edhmessagingrefineddev"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Id": "PutObjPolicy",
+          "Statement": [
+            {
+              "Sid": "DenyIncorrectEncryptionHeader",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingrefineddev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnEncryptedObjectUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhmessagingrefineddev/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "Null": {
+                  "s3:x-amz-server-side-encryption": "true"
+                }
+              }
+            },
+            {
+              "Sid": "Access-to-specific-VPCE-only",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*"
+              ],
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingrefineddev"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhmessagingrefineddev/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringNotEquals": {
+                  "aws:sourceVpce": [
+                    "vpce-15c7087c",
+                    "vpce-f0834f99",
+                    "vpce-8d72bae4"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "s3policyamzs3edhpkg": {
+      "Type": "AWS::S3::BucketPolicy",
+      "Properties": {
+        "Bucket": {
+          "Ref": "s3amzs3edhpkg"
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Id": "PutObjPolicy",
+          "Statement": [
+            {
+              "Sid": "Full permissions for cross account access",
+              "Effect": "Allow",
+              "Principal": {
+                "AWS": "arn:aws:iam::276654360894:root"
+              },
+              "Action": "s3:*",
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhpkg"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhpkg/*"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "Sid": "DenyIncorrectEncryptionHeader",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhpkg/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "StringNotEquals": {
+                  "s3:x-amz-server-side-encryption": "AES256"
+                }
+              }
+            },
+            {
+              "Sid": "DenyUnEncryptedObjectUploads",
+              "Effect": "Deny",
+              "Principal": "*",
+              "Action": "s3:PutObject",
+              "Resource": {
+                "Fn::Join": [
+                  "",
+                  [
+                    "arn:aws:s3:::",
+                    "amzs",
+                    "3edhpkg/*"
+                  ]
+                ]
+              },
+              "Condition": {
+                "Null": {
+                  "s3:x-amz-server-side-encryption": "true"
+                }
+              }
+            },
+            {
+              "Sid": "Access-to-specific-VPCE-only",
+              "Effect": "Allow",
+              "Principal": "*",
+              "Action": [
+                "s3:GetObject*",
+                "s3:PutObject*",
+                "s3:DeleteObject*"
+              ],
+              "Resource": [
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhpkg"
+                    ]
+                  ]
+                },
+                {
+                  "Fn::Join": [
+                    "",
+                    [
+                      "arn:aws:s3:::",
+                      "amzs",
+                      "3edhpkg/*"
+                    ]
+                  ]
+                }
+              ],
+              "Condition": {
+                "StringEquals": {
+                  "aws:sourceVpce": [
+                    "vpce-15c7087c",
+                    "vpce-f0834f99",
+                    "vpce-8d72bae4"
+                  ]
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "dchpassoc2": {
+      "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+      "Properties": {
+        "VpcId": {
+          "Ref": "vpc6057bd06"
+        },
+        "DhcpOptionsId": "dopt-22d83d45"
+      }
+    },
+    "ingress1": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "10021",
+        "ToPort": "11099",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress2": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "10021",
+        "ToPort": "11099",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress3": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "10021",
+        "ToPort": "11099",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress4": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "21050",
+        "ToPort": "21050",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress5": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "21050",
+        "ToPort": "21050",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress6": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "21050",
+        "ToPort": "21050",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress7": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5901",
+        "ToPort": "5902",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress8": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5901",
+        "ToPort": "5902",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress9": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5901",
+        "ToPort": "5902",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress10": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6969",
+        "ToPort": "7080",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress11": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6969",
+        "ToPort": "7080",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress12": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6969",
+        "ToPort": "7080",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress13": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "8343",
+        "ToPort": "8821",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress14": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "8343",
+        "ToPort": "8821",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress15": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "8343",
+        "ToPort": "8821",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress16": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "9360",
+        "ToPort": "9452",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress17": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "9360",
+        "ToPort": "9452",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress18": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "9360",
+        "ToPort": "9452",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress19": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "7443",
+        "ToPort": "7572",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress20": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "7443",
+        "ToPort": "7572",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress21": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "7443",
+        "ToPort": "7572",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress22": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "icmp",
+        "FromPort": "-1",
+        "ToPort": "-1",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress23": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "icmp",
+        "FromPort": "-1",
+        "ToPort": "-1",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress24": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "udp",
+        "FromPort": "8561",
+        "ToPort": "8561",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress25": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "udp",
+        "FromPort": "8561",
+        "ToPort": "8561",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress26": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "7980",
+        "ToPort": "8111",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress27": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "7980",
+        "ToPort": "8111",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress28": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "7980",
+        "ToPort": "8111",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress29": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "-1",
+        "SourceSecurityGroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "SourceSecurityGroupOwnerId": "869052972610"
+      }
+    },
+    "ingress30": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "8561",
+        "ToPort": "8561",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress31": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "CidrIp": "10.192.11.196/32"
+      }
+    },
+    "ingress32": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress33": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "22",
+        "ToPort": "22",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress34": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5660",
+        "ToPort": "5660",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress35": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5660",
+        "ToPort": "5660",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress36": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5660",
+        "ToPort": "5660",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress37": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6051",
+        "ToPort": "6051",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress38": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6051",
+        "ToPort": "6051",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress39": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6051",
+        "ToPort": "6051",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress40": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6001",
+        "ToPort": "6002",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress41": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6001",
+        "ToPort": "6002",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress42": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "6001",
+        "ToPort": "6002",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress43": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5451",
+        "ToPort": "5451",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress44": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5451",
+        "ToPort": "5451",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress45": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "5451",
+        "ToPort": "5451",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "ingress46": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "9832",
+        "ToPort": "9832",
+        "CidrIp": "10.160.0.0/16"
+      }
+    },
+    "ingress47": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "9832",
+        "ToPort": "9832",
+        "CidrIp": "10.255.0.0/16"
+      }
+    },
+    "ingress48": {
+      "Type": "AWS::EC2::SecurityGroupIngress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "tcp",
+        "FromPort": "9832",
+        "ToPort": "9832",
+        "CidrIp": "172.16.0.0/12"
+      }
+    },
+    "egress1": {
+      "Type": "AWS::EC2::SecurityGroupEgress",
+      "Properties": {
+        "GroupId": {
+          "Ref": "sgSASDEVSG"
+        },
+        "IpProtocol": "-1",
+        "CidrIp": "0.0.0.0/0"
+      }
+    }
+  },
+  "Description": ""
+}
