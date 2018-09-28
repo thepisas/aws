@@ -1,0 +1,133 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Resources": {
+    "RStudioInstance": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "DisableApiTermination": "false",
+        "InstanceInitiatedShutdownBehavior": "stop",
+        "EbsOptimized": "true",
+        "IamInstanceProfile": "arn:aws:iam::869052972610:instance-profile/sasdev_role",
+        "ImageId": "ami-26ebbc5c",
+        "InstanceType": "r5.xlarge",
+        "KeyName": "SASDEV",
+        "Monitoring": "false",
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          },
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03"
+          },
+          {
+            "Key": "OS",
+            "Value": "RedHatLinux"
+          },
+          {
+            "Key": "Daily-Snapshot",
+            "Value": "False"
+          }
+        ],
+        "Volumes": [
+          {
+            "Device": "/dev/sdf",
+            "VolumeId": {
+              "Ref": "volumevol07ed4efd6311ed373"
+            }
+          },
+          {
+            "Device": "/dev/sdg",
+            "VolumeId": {
+              "Ref": "volumevol0c72d70cddd69d4d4"
+            }
+          },
+          {
+            "Device": "/dev/sdh",
+            "VolumeId": {
+              "Ref": "volumevol0db84fafb98fdd570"
+            }
+          }
+        ],
+        "NetworkInterfaces": [
+          {
+            "DeleteOnTermination": "true",
+            "Description": "Primary network interface",
+            "DeviceIndex": 0,
+            "SubnetId": {
+              "Ref": "subnet0bad1c26"
+            },
+                "GroupSet": [
+              "sg-b503cac9",
+              {
+                "Ref": "sgSASDEVSG"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "volumevol07ed4efd6311ed373": {
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "Encrypted": true,
+        "Size": "512",
+        "VolumeType": "gp2",
+        "Tags": [
+          {
+            "Key": "manualsnapshot",
+            "Value": "true"
+          },
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          },
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03 SASBin and SW Depot"
+          }
+        ]
+      }
+    },
+    "volumevol0c72d70cddd69d4d4": {
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "Encrypted": true,
+        "Size": "512",
+        "VolumeType": "gp2",
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          },
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03 saswork"
+          }
+        ]
+      }
+    },
+    "volumevol0db84fafb98fdd570": {
+      "Type": "AWS::EC2::Volume",
+      "Properties": {
+        "AvailabilityZone": "us-east-1b",
+        "Encrypted": true,
+        "Size": "512",
+        "VolumeType": "st1",
+        "Tags": [
+          {
+            "Key": "Name",
+            "Value": "amzlinsasd03 sasdata"
+          },
+          {
+            "Key": "Application",
+            "Value": "SAS"
+          }
+        ]
+      }
+    },
+  "Description": ""
+}
