@@ -31,6 +31,7 @@ mv nmon16g_x86_rhel72 /usr/local/bin/nmon
 #Install AWS CLI
 
 
+yum install -y unzip
 curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
 unzip awscli-bundle.zip
 sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws

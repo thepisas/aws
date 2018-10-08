@@ -10,16 +10,16 @@
         "IamInstanceProfile": "arn:aws:iam::869052972610:instance-profile/sasdev_role",
         "ImageId": "ami-26ebbc5c",
         "InstanceType": "r5.xlarge",
-        "KeyName": "SASDEV",
+        "KeyName": "apathros",
         "Monitoring": "false",
         "Tags": [
           {
             "Key": "Application",
-            "Value": "SAS"
+            "Value": "RStudio"
           },
           {
             "Key": "Name",
-            "Value": "amzlinsasd03"
+            "Value": "poc-amzrstedhdev01"
           },
           {
             "Key": "OS",
@@ -34,19 +34,7 @@
           {
             "Device": "/dev/sdf",
             "VolumeId": {
-              "Ref": "volumevol07ed4efd6311ed373"
-            }
-          },
-          {
-            "Device": "/dev/sdg",
-            "VolumeId": {
-              "Ref": "volumevol0c72d70cddd69d4d4"
-            }
-          },
-          {
-            "Device": "/dev/sdh",
-            "VolumeId": {
-              "Ref": "volumevol0db84fafb98fdd570"
+              "Ref": "VolApp"
             }
           }
         ],
@@ -68,13 +56,14 @@
         ]
       }
     },
-    "volumevol07ed4efd6311ed373": {
+    "VolApp": {
       "Type": "AWS::EC2::Volume",
       "Properties": {
         "AvailabilityZone": "us-east-1b",
         "Encrypted": true,
-        "Size": "512",
+        "Size": "128",
         "VolumeType": "gp2",
+	"DeleteOnTermination": true,
         "Tags": [
           {
             "Key": "manualsnapshot",
@@ -82,52 +71,14 @@
           },
           {
             "Key": "Application",
-            "Value": "SAS"
+            "Value": "RStudio"
           },
           {
             "Key": "Name",
-            "Value": "amzlinsasd03 SASBin and SW Depot"
+            "Value": ""
           }
         ]
       }
-    },
-    "volumevol0c72d70cddd69d4d4": {
-      "Type": "AWS::EC2::Volume",
-      "Properties": {
-        "AvailabilityZone": "us-east-1b",
-        "Encrypted": true,
-        "Size": "512",
-        "VolumeType": "gp2",
-        "Tags": [
-          {
-            "Key": "Application",
-            "Value": "SAS"
-          },
-          {
-            "Key": "Name",
-            "Value": "amzlinsasd03 saswork"
-          }
-        ]
-      }
-    },
-    "volumevol0db84fafb98fdd570": {
-      "Type": "AWS::EC2::Volume",
-      "Properties": {
-        "AvailabilityZone": "us-east-1b",
-        "Encrypted": true,
-        "Size": "512",
-        "VolumeType": "st1",
-        "Tags": [
-          {
-            "Key": "Name",
-            "Value": "amzlinsasd03 sasdata"
-          },
-          {
-            "Key": "Application",
-            "Value": "SAS"
-          }
-        ]
-      }
-    },
-  "Description": ""
+    }
+}
 }

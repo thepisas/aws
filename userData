@@ -7,6 +7,26 @@ chown apathros:apathros /home/apathros/.ssh
 chmod 644 /home/apathros/.ssh/authorized_keys
 chmod 700 /home/apathros/.ssh
 echo "apathros ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
-yum install nvme-cli -y
-#hostnamectl set-hostname --static ${hostname} ; reboot
 
+#yum update -y
+
+yum install nvme-cli -y
+
+# Install SSM Agent
+cd /tmp
+yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+systemctl start amazon-ssm-agent
+
+#Install AWS CLI
+cd /tmp
+yum install -y unzip
+curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+unzip awscli-bundle.zip
+sudo ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+
+
+# Change Hostname
+/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text >> /tmp/newhostname.txt
+hostnamectl set-hostname `cat /tmp/newhostname.txt`
+
+#reboot
