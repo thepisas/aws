@@ -1,0 +1,120 @@
+{
+  "AWSTemplateFormatVersion":"2010-09-09",
+	"Parameters": {
+		"DesiredCount": {
+			"Type": "Number",
+			"Default": 1,
+			"Description" : "The number of simultaneous tasks that you want to run on the cluster."
+		},
+		"Cluster": {
+			"Type": "String",
+			"Description" : "The name of the existing ECS Cluster the Service and Task will be created in. e.g. amzecs-posrf-dev | amzecs-posrf-qa"
+		},
+		"TargetGroupArn": {
+			"Type": "String",
+			"Description" : "The ARN of the Target Group that the ELB is pointing at. e.g. arn:aws:elasticloadbalancing:us-east-1:869052972610:targetgroup/amztg-ecs-posrf-dev/7bc33365cc0df36b "
+		},
+		"ApplicationName": {
+			"Type": "String",
+			"Default": "bucketstorageapi",
+			"Description" : "The application name that the service will be deploying."
+		},
+		"RepositoryUri": {
+			"Type": "String",
+			"Description" : "ECR Repository URI that the Task will use for an image. e.g. 869052972610.dkr.ecr.us-east-1.amazonaws.com/amzecr_posrf_dev/bucketstorageapi "
+		},
+		"ImageTag": {
+			"Type": "String",
+			"Default": "latest",
+			"Description" : "The Tag value the task will use for getting the image from the ECR Repository."
+		},
+		"ContainerPort": {
+			"Type": "Number",
+			"Default": "5000",
+			"Description" : "The container port for port mapping."
+		},
+		"HostPort": {
+			"Type": "Number",
+			"Default": "0",
+			"Description" : "The host port for port mapping."
+		},
+		"ContainerCpu": {
+			"Type": "Number",
+			"Default": "0",
+			"Description" : "The minimum number of CPU units to reserve for the container."
+		},
+		"ContainerMemory": {
+			"Type": "Number",
+			"Default": "500",
+			"Description" : "The hard limit (in MiB) of memory to present to the container."
+		},
+		"LogGroupName": {
+			"Type": "String",
+			"Description" : "Name of an existing Cloud Watch Log Group that the instances can write logs. e.g. /ecs/amzecs-posrf-dev"
+		},
+		"LogGroupRegion": {
+			"Type": "String",
+			"Default": "us-east-1",
+			"Description" : "The region of the existing Cloud Watch Log Group."
+		},
+		"ServiceRole": {
+			"Type": "String",
+			"Default": "ecsServiceRole",
+			"Description" : "The arn or name of role that is assigned to the service."
+		},
+		"TaskRoleArn": {
+			"Type": "String",
+			"Default": "",
+			"Description" : "The arn of the role that is assigned to the task.  e.g. EcsPosRfBucketStorageapiTaskRfDevRole | EcsPosRfBucketStorageapiTaskRfQaRole"
+		}
+	},
+	"Resources": {
+		"Service": {
+			"Type": "AWS::ECS::Service",
+			"Properties": {
+				"Cluster": { "Ref": "Cluster" },
+				"DesiredCount": { "Ref": "DesiredCount" },
+				"ServiceName" : {"Fn::Join": ["",  [{ "Ref": "ApplicationName" } , "Service"]]},
+				"TaskDefinition": { "Ref": "TaskDefinition1" },
+				"Role" : { "Ref": "ServiceRole" },
+				"LoadBalancers": [
+					{
+					  "ContainerName": { "Ref": "ApplicationName" },
+					  "ContainerPort":  { "Ref": "ContainerPort" },
+					  "TargetGroupArn" : {"Ref": "TargetGroupArn" }
+					}
+				  ]
+			}
+		},
+		"TaskDefinition1": {
+			"Type": "AWS::ECS::TaskDefinition",
+			"Properties": {
+				"TaskRoleArn" :  {"Ref": "TaskRoleArn" },
+				"ContainerDefinitions": [
+				{
+					"Name":  { "Ref": "ApplicationName" },
+					"Image": {"Fn::Join": [":",  [{ "Ref": "RepositoryUri" } , { "Ref": "ImageTag" }]]},
+					"Cpu": { "Ref": "ContainerCpu" },
+					"PortMappings": [
+					{
+						"ContainerPort": { "Ref": "ContainerPort" },
+						"HostPort": { "Ref": "HostPort" }
+					}
+					],
+					"Memory": { "Ref": "ContainerMemory" },
+					"Essential": "true",
+					"LogConfiguration" :{
+						"LogDriver" : "awslogs",
+						"Options" :{
+							"awslogs-group": { "Ref": "LogGroupName" },
+							"awslogs-region": { "Ref": "LogGroupRegion" },
+							"awslogs-stream-prefix": {"Fn::Join": ["-",  [{ "Ref": "Cluster" } , { "Ref": "ApplicationName" }, "app"]]}
+						  }
+					  }
+				}
+			  ]
+			}
+		}
+	}
+}
+

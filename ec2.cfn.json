@@ -1,0 +1,117 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Parameters": {
+     "DisableApiTermination": {
+             "Type": "String",
+             "Default": "false",
+             "Description": "Disable instance termination protection"
+     },
+     "IamInstanceProfile": {
+             "Type": "String",
+             "Default": "Ec2RstudioDevRole",
+             "Description": "The name of the ec2 instance profile e.g. sasdev_role"
+     },
+     "AMI": {
+             "Type": "AWS::EC2::Image::Id",
+             "Default": "ami-0e524e75",
+             "Description": "AMI Id , e.g. ami-0e524e75"
+     },
+     "InstanceType": {
+             "Type": "String",
+             "Description": "EC2 Instance Type , e.g. r5.large"
+     },
+     "KeyName": {
+             "Type": "AWS::EC2::KeyPair::KeyName",
+             "Description": "KeyPair Name to ssh in, e.g. RStudio"
+     },
+     "SecurityGroupIds": {
+             "Type": "AWS::EC2::SecurityGroup::Id",
+             "Description": "SecurityGroup Ids, e.g. sg-b503cac9"
+     },
+     "SubnetId": {
+             "Type": "AWS::EC2::Subnet::Id",
+             "Description": "Subnet Id, e.g. subnet-0bad1c26"
+     },
+     "Application": {
+             "Type": "String",
+             "Description": "The value of Tag Key:Application, e.g. RStudio"
+     },
+     "Hostname": {
+             "Type": "String",
+             "Description": "The value of Tag Key:Name, e.g. poc-amzrstdev01"
+     },
+     "OS": {
+             "Type": "String",
+             "Default": "RedHatLinux",
+             "Description": "The value of Tag Key:OS, e.g. RedHatLinux"
+     },
+     "DailySnapshot": {
+             "Type": "String",
+             "Default": "True",
+             "Description": "The value of Tag Key:Daily-Snapshot, e.g. True"
+     },
+     "RootVolumeSize": {
+             "Type": "Number",
+             "Description": "The root volume size in Gigs, eg. 50 "
+     },
+     "AppVolumeSize": {
+             "Type": "Number",
+             "Description": "The app volume size in Gigs, eg. 128 "
+     }
+  },
+  "Resources": {
+    "RStudioInstance": {
+      "Type": "AWS::EC2::Instance",
+      "Properties": {
+        "DisableApiTermination": { "Ref": "DisableApiTermination"},
+        "InstanceInitiatedShutdownBehavior": "stop",
+        "EbsOptimized": "true",
+        "IamInstanceProfile": { "Ref": "IamInstanceProfile"},
+        "ImageId": { "Ref": "AMI"},
+        "InstanceType": { "Ref": "InstanceType"},
+        "KeyName": { "Ref": "KeyName"},
+        "Monitoring": "false",
+        "SecurityGroupIds": [{ "Ref": "SecurityGroupIds"}],
+        "SubnetId": { "Ref": "SubnetId"},
+        "Tags": [
+          {
+            "Key": "Application",
+            "Value": { "Ref": "Application"}
+          },
+          {
+          "Key": "Name",
+	  "Value": { "Ref": "Hostname"}
+	  },
+	  {
+		  "Key": "OS",
+		  "Value": { "Ref": "OS"}
+	  },
+	  {
+		  "Key": "Daily-Snapshot",
+		  "Value": { "Ref": "DailySnapshot"}
+	  }
+	],
+	"BlockDeviceMappings" : [
+	{
+		"DeviceName" : "/dev/sda1",
+		"Ebs" : {
+			"DeleteOnTermination" : "false",
+			"VolumeType" : "gp2",
+			"VolumeSize" : { "Ref": "RootVolumeSize" }
+		}
+	},
+	{
+		"DeviceName" : "/dev/sdf",
+		"Ebs" : {
+			"DeleteOnTermination" : "false",
+			"Encrypted": true,
+			"VolumeType" : "gp2",
+			"VolumeSize" : { "Ref": "AppVolumeSize" }
+		}
+	}
+	]
+      }
+    }
+  }
+}
+
