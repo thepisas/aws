@@ -27,3 +27,7 @@ aws ecr get-login
 aws ecr describe-repositories
 aws ecr list-images --repository-name amzecsrfdev/bucketstorageapi
 ###ECS- End##################################
+
+#create aws account alias
+aws iam list-account-aliases
+aws iam create-account-alias --account-alias tco-nonproduction
