@@ -1,117 +1,273 @@
 {
-  "AWSTemplateFormatVersion": "2010-09-09",
-  "Parameters": {
-     "DisableApiTermination": {
-             "Type": "String",
-             "Default": "false",
-             "Description": "Disable instance termination protection"
-     },
-     "IamInstanceProfile": {
-             "Type": "String",
-             "Default": "Ec2RstudioDevRole",
-             "Description": "The name of the ec2 instance profile e.g. sasdev_role"
-     },
-     "AMI": {
-             "Type": "AWS::EC2::Image::Id",
-             "Default": "ami-0e524e75",
-             "Description": "AMI Id , e.g. ami-0e524e75"
-     },
-     "InstanceType": {
-             "Type": "String",
-             "Description": "EC2 Instance Type , e.g. r5.large"
-     },
-     "KeyName": {
-             "Type": "AWS::EC2::KeyPair::KeyName",
-             "Description": "KeyPair Name to ssh in, e.g. RStudio"
-     },
-     "SecurityGroupIds": {
-             "Type": "AWS::EC2::SecurityGroup::Id",
-             "Description": "SecurityGroup Ids, e.g. sg-b503cac9"
-     },
-     "SubnetId": {
-             "Type": "AWS::EC2::Subnet::Id",
-             "Description": "Subnet Id, e.g. subnet-0bad1c26"
-     },
-     "Application": {
-             "Type": "String",
-             "Description": "The value of Tag Key:Application, e.g. RStudio"
-     },
-     "Hostname": {
-             "Type": "String",
-             "Description": "The value of Tag Key:Name, e.g. poc-amzrstdev01"
-     },
-     "OS": {
-             "Type": "String",
-             "Default": "RedHatLinux",
-             "Description": "The value of Tag Key:OS, e.g. RedHatLinux"
-     },
-     "DailySnapshot": {
-             "Type": "String",
-             "Default": "True",
-             "Description": "The value of Tag Key:Daily-Snapshot, e.g. True"
-     },
-     "RootVolumeSize": {
-             "Type": "Number",
-             "Description": "The root volume size in Gigs, eg. 50 "
-     },
-     "AppVolumeSize": {
-             "Type": "Number",
-             "Description": "The app volume size in Gigs, eg. 128 "
-     }
-  },
-  "Resources": {
-    "RStudioInstance": {
-      "Type": "AWS::EC2::Instance",
-      "Properties": {
-        "DisableApiTermination": { "Ref": "DisableApiTermination"},
-        "InstanceInitiatedShutdownBehavior": "stop",
-        "EbsOptimized": "true",
-        "IamInstanceProfile": { "Ref": "IamInstanceProfile"},
-        "ImageId": { "Ref": "AMI"},
-        "InstanceType": { "Ref": "InstanceType"},
-        "KeyName": { "Ref": "KeyName"},
-        "Monitoring": "false",
-        "SecurityGroupIds": [{ "Ref": "SecurityGroupIds"}],
-        "SubnetId": { "Ref": "SubnetId"},
-        "Tags": [
-          {
-            "Key": "Application",
-            "Value": { "Ref": "Application"}
-          },
-          {
-          "Key": "Name",
-	  "Value": { "Ref": "Hostname"}
-	  },
-	  {
-		  "Key": "OS",
-		  "Value": { "Ref": "OS"}
-	  },
-	  {
-		  "Key": "Daily-Snapshot",
-		  "Value": { "Ref": "DailySnapshot"}
-	  }
-	],
-	"BlockDeviceMappings" : [
-	{
-		"DeviceName" : "/dev/sda1",
-		"Ebs" : {
-			"DeleteOnTermination" : "false",
-			"VolumeType" : "gp2",
-			"VolumeSize" : { "Ref": "RootVolumeSize" }
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "Creates the RStudio Stack including Ec2, Role, Instance Profile, Security Group, SG Rules and ebs volumes",
+	"Parameters": {
+  	"Environment": {
+           "Type": "String",
+           "Default": "dev",
+           "AllowedValues" : ["dev", "qa", "stg", "prd"],
+           "Description": " The environment in which the resources are to be provisioned"
+		},
+		"VpcId": {
+           "Type": "AWS::EC2::VPC::Id",
+           "Default": "vpc-6057bd06",
+           "Description": "VPC Id ; vpc-6057bd06 is non-prod VPC,  vpc-f4682392 is prod VPC"
+		},
+		"EnableInstanceTerminationProtection": {
+			"Type": "String",
+			"Default": "true",
+			"AllowedValues" : ["true", "false"],
+			"Description": "Instance termination protection"
+		},
+		"Ec2InstanceRoleName": {
+			"Type": "String",
+			"Default": "Ec2RStudioDevRole",
+			"Description": "The name of the ec2 instance role to be created e.g. Ec2RStudioDevRole"
+		},
+		"AMI": {
+			"Type": "AWS::EC2::Image::Id",
+			"Default": "ami-0e524e75",
+			"Description": "AMI Id , e.g. ami-0e524e75 , ami-d59aa3af"
+		},
+		"InstanceType": {
+			"Type": "String",
+			"Description": "EC2 Instance Type , e.g. r5.xlarge"
+		},
+		"KeyName": {
+			"Type": "AWS::EC2::KeyPair::KeyName",
+			"Description": "KeyPair Name to ssh in, e.g. RStudio"
+		},
+		"SubnetId": {
+			"Type": "AWS::EC2::Subnet::Id",
+			"Description": "Subnet Id, e.g. subnet-0bad1c26"
+		},
+		"Application": {
+			"Type": "String",
+			"Description": "The value of Tag Key:Application, e.g. RStudio"
+		},
+		"Hostname": {
+			"Type": "String",
+			"Description": "The value of Tag Key:Name, e.g. poc-amzrstdev01"
+		},
+		"OS": {
+			"Type": "String",
+			"Default": "RedHatLinux",
+			"Description": "The value of Tag Key:OS, e.g. RedHatLinux"
+		},
+		"DailySnapshot": {
+			"Type": "String",
+			"Default": "True",
+			"Description": "The value of Tag Key:Daily-Snapshot, e.g. True"
+		},
+		"RootVolumeSize": {
+			"Type": "Number",
+			"Description": "The root volume size in Gigs, eg. 50 "
+		},
+		"AppVolumeSize": {
+			"Type": "Number",
+			"Description": "The app volume size in Gigs, eg. 128 "
+		},
+		"SecurityGroupIdDataPipe": {
+			"Type": "AWS::EC2::SecurityGroup::Id",
+			"Default": "sg-b503cac9 ",
+			"Description": "Security Group Id of DP-MSS-ProtectedHosts"
+		},
+		"SecurityGroup1Name": {
+			"Type": "String",
+			"Default": "RStudioDev",
+			"Description": "Security Group to be created for RStudio Instances"
+		},
+		"SecurityGroup1Description": {
+			"Type": "String",
+			"Default": "Security Group for RStudio Instances",
+			"Description": "Security Group description for RStudio Instances"
 		}
 	},
-	{
-		"DeviceName" : "/dev/sdf",
-		"Ebs" : {
-			"DeleteOnTermination" : "false",
-			"Encrypted": true,
-			"VolumeType" : "gp2",
-			"VolumeSize" : { "Ref": "AppVolumeSize" }
+	"Resources": {
+		"IamRole": {
+			"Type": "AWS::IAM::Role",
+			"Properties": {
+				"RoleName": { "Ref": "Ec2InstanceRoleName" },
+				"AssumeRolePolicyDocument": {
+					"Version" : "2012-10-17",
+					"Statement": [ {
+						"Effect": "Allow",
+						"Principal": {
+							"Service": [ "ec2.amazonaws.com" ]
+						},
+						"Action": [ "sts:AssumeRole" ]
+					} ]
+				}
+			}
+		},
+		"InstanceProfile": {
+			"Type": "AWS::IAM::InstanceProfile",
+			"Properties": {
+				"Roles": [ { "Ref": "IamRole"} ],
+				"InstanceProfileName": {"Fn::Join": ["-",  [{ "Ref": "Hostname" } ,{ "Ref": "Ec2InstanceRoleName" }]]}
+				}
+			},
+		"Ec2Instance": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"DisableApiTermination": { "Ref": "EnableInstanceTerminationProtection"},
+				"InstanceInitiatedShutdownBehavior": "stop",
+				"EbsOptimized": "true",
+				"IamInstanceProfile": { "Ref": "InstanceProfile"},
+				"ImageId": { "Ref": "AMI"},
+				"InstanceType": { "Ref": "InstanceType"},
+				"KeyName": { "Ref": "KeyName"},
+				"Monitoring": "false",
+				"SecurityGroupIds": [ {"Ref": "SecurityGroupIdDataPipe"}, { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]}],
+				"SubnetId": { "Ref": "SubnetId"},
+				"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				},
+				{
+					"Key": "Name",
+					"Value": { "Ref": "Hostname"}
+				},
+				{
+					"Key": "OS",
+					"Value": { "Ref": "OS"}
+				},
+				{
+					"Key": "Daily-Snapshot",
+					"Value": { "Ref": "DailySnapshot"}
+				}
+				],
+				"BlockDeviceMappings" : [
+					{
+						"DeviceName" : "/dev/sda1",
+						"Ebs" : {
+							"DeleteOnTermination" : "false",
+							"VolumeType" : "gp2",
+							"VolumeSize" : { "Ref": "RootVolumeSize" }
+						}
+					},
+					{
+						"DeviceName" : "/dev/sdf",
+						"Ebs" : {
+							"DeleteOnTermination" : "false",
+							"Encrypted": true,
+							"VolumeType" : "gp2",
+							"VolumeSize" : { "Ref": "AppVolumeSize" }
+						}
+					}
+				],
+				"UserData" :{ "Fn::Base64" : { "Fn::Join" : ["", [
+					"#!/bin/bash -xe\n",
+					"
+					]
+				}
+
+			}
+		},
+		"SecurityGroup1": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupName" : { "Ref": "SecurityGroup1Name" },
+				"GroupDescription" : {"Fn::Join": ["-",  [{ "Ref": "SecurityGroup1Description" } , { "Ref": "Environment" }]]},
+				"VpcId": { "Ref": "VpcId" },
+				"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+				]
+			}
+		},
+		"SG1Ingress1": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "8787",
+				"ToPort": "8787",
+				"CidrIp": "10.160.0.0/16"
+			}
+		},
+		"SG1Ingress2": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId":  { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "8787",
+				"ToPort": "8787",
+				"CidrIp": "10.255.0.0/16"
+			}
+		},
+		"SG1Ingress3": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "8787",
+				"ToPort": "8787",
+				"CidrIp": "172.16.0.0/12"
+			}
+		},
+		"SG1Ingress4": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "22",
+				"ToPort": "22",
+				"CidrIp": "10.160.0.0/16"
+			}
+		},
+		"SG1Ingress5": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "22",
+				"ToPort": "22",
+				"CidrIp": "10.255.0.0/16"
+			}
+		},
+		"SG1Ingress6": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "22",
+				"ToPort": "22",
+				"CidrIp": "172.16.0.0/12"
+			}
+		},
+		"SG1Ingress7": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "icmp",
+				"FromPort": "-1",
+				"ToPort": "-1",
+				"CidrIp": "10.160.0.0/16"
+			}
+		},
+		"SG1Ingress8": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "icmp",
+				"FromPort": "-1",
+				"ToPort": "-1",
+				"CidrIp": "172.16.0.0/12"
+			}
+		},
+		"SG1Ingress9": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "icmp",
+				"FromPort": "-1",
+				"ToPort": "-1",
+				"CidrIp": "10.255.0.0/16"
+			}
 		}
 	}
-	]
-      }
-    }
-  }
 }
-

@@ -1,14 +1,15 @@
 #!/bin/bash
-useradd -m -G ssh_access apathros
-mkdir /home/apathros/.ssh
-echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key" > /home/apathros/.ssh/authorized_keys
-chown apathros:apathros /home/apathros/.ssh/authorized_keys
-chown apathros:apathros /home/apathros/.ssh
-chmod 644 /home/apathros/.ssh/authorized_keys
-chmod 700 /home/apathros/.ssh
-echo "apathros ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+for i in apathros ; do 
+	useradd -m -G ssh_access $i  
+	mkdir /home/$i/.ssh 
+	chown -r $i:$i /home/$i/.ssh 
+	chmod 644 /home/$i/.ssh/authorized_keys 
+	chmod 700 /home/$i/.ssh 
+	echo "$i ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+	echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key" >> /home/$i/.ssh/authorized_keys
+done
 
-#yum update -y
+yum update -y
 
 yum install nvme-cli -y
 
