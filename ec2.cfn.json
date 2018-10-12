@@ -97,7 +97,8 @@
 						},
 						"Action": [ "sts:AssumeRole" ]
 					} ]
-				}
+				},
+				"ManagedPolicyArns": ["arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess","arn:aws:iam::869052972610:policy/TCO_SSM_Policy_For_EC2","arn:aws:iam::869052972610:policy/EBS_Snapshots" ]
 			}
 		},
 		"InstanceProfile": {
@@ -158,12 +159,12 @@
 					}
 				],
 				"UserData" :{ "Fn::Base64" : { "Fn::Join" : ["", [
-					"#!/bin/bash -xe\n",
-					"
+					"#!/bin/bash -xe\n"
+					]
 					]
 				}
-
 			}
+		}
 		},
 		"SecurityGroup1": {
 			"Type": "AWS::EC2::SecurityGroup",

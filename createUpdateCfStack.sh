@@ -1,6 +1,6 @@
-if [ $# -ne 5 ];then
+if [ $# -ne 4 ];then
   echo -e "usage: ${BASH_SOURCE[0]} stack_name cfn_template_file Application operation"
-  echo -e "e.g ${BASH_SOURCE[0]} RStudioDev ec2.cfn.json create"
+  echo -e "e.g ${BASH_SOURCE[0]} RStudioDev ec2.cfn.json RStudio create"
   exit 1
 fi
 stack_name=${1}
