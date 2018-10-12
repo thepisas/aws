@@ -1,0 +1,70 @@
+[
+	{
+		"ParameterKey": "AMI",
+		"ParameterValue": "ami-0e524e75"
+	},
+	{
+		"ParameterKey": "Application",
+		"ParameterValue": "RStudio"
+	},
+	{
+		"ParameterKey": "AppVolumeSize",
+		"ParameterValue": "128"
+	},
+	{
+		"ParameterKey": "DailySnapshot",
+		"ParameterValue": "True"
+	},
+	{
+		"ParameterKey": "Ec2InstanceRoleName",
+		"ParameterValue": "Ec2RStudioDevRole"
+	},
+	{
+		"ParameterKey": "EnableInstanceTerminationProtection",
+		"ParameterValue": "true"
+	},
+	{
+		"ParameterKey": "Environment",
+		"ParameterValue": "dev"
+	},
+	{
+		"ParameterKey": "Hostname",
+		"ParameterValue": "poc-amzrstdev01"
+	},
+	{
+		"ParameterKey": "InstanceType",
+		"ParameterValue": "r5.xlarge"
+	},
+	{
+		"ParameterKey": "KeyName",
+		"ParameterValue": "apathros"
+	},
+	{
+		"ParameterKey": "OS",
+		"ParameterValue": "RedHatLinux"
+	},
+	{
+		"ParameterKey": "RootVolumeSize",
+		"ParameterValue": "100"
+	},
+	{
+		"ParameterKey": "SecurityGroup1Description",
+		"ParameterValue": "Security Group for RStudio Instances"
+	},
+	{
+		"ParameterKey": "SecurityGroup1Name",
+		"ParameterValue": "RStudioDev"
+	},
+	{
+		"ParameterKey": "SecurityGroupIdDataPipe",
+		"ParameterValue": "sg-b503cac9"
+	},
+	{
+		"ParameterKey": "SubnetId",
+		"ParameterValue": "subnet-0bad1c26"
+	},
+	{
+		"ParameterKey": "VpcId",
+		"ParameterValue": "vpc-6057bd06"
+	}
+]
