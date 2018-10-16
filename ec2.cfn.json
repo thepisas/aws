@@ -156,7 +156,7 @@
 				"KeyName":  { "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"SshKey" ]},
 				"Monitoring": "false",
 				"SecurityGroupIds": {
-					"Fn::Split": [ ",", { "Fn::Sub": [ "${idList},${SecurityGroup1}", { "idList": { "Fn::Join": [ ",", { "Ref": "SecurityGroupIdsDefault" } ] } } ] } ]
+					"Fn::Split": [ ",", { "Fn::Sub": [ "${SGIdList},${SecurityGroup1}", { "SGIdList": { "Fn::Join": [ ",", { "Ref": "SecurityGroupIdsDefault" } ] } } ] } ]
 				},
 				"SubnetId": { "Ref": "SubnetId"},
 				"Tags": [
@@ -239,7 +239,7 @@
 					"\n",
 					"# Set Hostname\n",
 					"hostnamectl set-hostname $(/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text)\n",
-					"#reboot"
+					"reboot"
 					]
 						]
 				}
