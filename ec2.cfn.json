@@ -5,19 +5,20 @@
   	"Environment": {
            "Type": "String",
            "Default": "dev",
-           "AllowedValues" : ["dev", "qa", "stg", "prd"],
+           "AllowedValues" : ["dev", "qa", "stg", "prd", "poc"],
            "Description": " The environment in which the resources are to be provisioned"
-		},
-		"VpcId": {
-           "Type": "AWS::EC2::VPC::Id",
-           "Default": "vpc-6057bd06",
-           "Description": "VPC Id ; vpc-6057bd06 is non-prod VPC,  vpc-f4682392 is prod VPC"
 		},
 		"EnableInstanceTerminationProtection": {
 			"Type": "String",
 			"Default": "true",
 			"AllowedValues" : ["true", "false"],
 			"Description": "Instance termination protection"
+		},
+		"VolumeDeleteOnInstanceTermination": {
+			"Type": "String",
+			"Default": "false",
+			"AllowedValues" : ["true", "false"],
+			"Description": "Delete EBS Volumes on Instance Termination"
 		},
 		"Ec2InstanceRoleName": {
 			"Type": "String",
@@ -32,10 +33,6 @@
 		"InstanceType": {
 			"Type": "String",
 			"Description": "EC2 Instance Type , e.g. r5.xlarge"
-		},
-		"KeyName": {
-			"Type": "AWS::EC2::KeyPair::KeyName",
-			"Description": "KeyPair Name to ssh in, e.g. RStudio"
 		},
 		"SubnetId": {
 			"Type": "AWS::EC2::Subnet::Id",
@@ -67,10 +64,10 @@
 			"Type": "Number",
 			"Description": "The app volume size in Gigs, eg. 128 "
 		},
-		"SecurityGroupIdDataPipe": {
-			"Type": "AWS::EC2::SecurityGroup::Id",
-			"Default": "sg-b503cac9 ",
-			"Description": "Security Group Id of DP-MSS-ProtectedHosts"
+		"SecurityGroupIdsDefault": {
+			"Type": "List<AWS::EC2::SecurityGroup::Id>",
+			"Default": "sg-b503cac9,sg-9a579ce5",
+			"Description": "List of default Security Group Ids"
 		},
 		"SecurityGroup1Name": {
 			"Type": "String",
@@ -83,7 +80,46 @@
 			"Description": "Security Group description for RStudio Instances"
 		}
 	},
+	"Mappings": {
+		"EnvironmentMap": {
+			"dev": { "AMI": "ami-0e524e75" , "VpcId": "vpc-6057bd06" ,"SshKey": "tco-nonproduction", "CamelCase": "Dev" },
+			"qa": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "tco-nonproduction", "CamelCase": "Qa" },
+			"poc": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "apathros", "CamelCase": "Poc" },
+			"prod": { "AMI": "ami-d59aa3af", "VpcId" :"vpc-f4682392", "SshKey": "tco-production", "CamelCase": "Prod" }
+		}
+	},
 	"Resources": {
+		"IamPolicy": {
+			"Type" : "AWS::IAM::Policy",
+			"Properties" : {
+				"PolicyName" : "Ec2S3AccessRStudioDevPolicy",
+				"PolicyDocument" : {
+					"Version" : "2012-10-17",
+					 "Statement": [ {
+						 "Effect"   : "Allow",
+						 "Action"   : [ 
+							 "s3:PutObject",
+							 "s3:GetObject",
+							 "s3:ListBucket",
+							 "s3:ListObjects"
+						 ],
+						 "Resource" : [
+						   { "Fn::Join": ["",  [ "arn:aws:s3:::PeopleSoftRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::HyperionRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::EDWRRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::CountwiseRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::KronosRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
+						   { "Fn::Join": ["",  [ "arn:aws:s3:::PeopleSoftRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}, "/*"]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::HyperionRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]} , "/*"]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::EDWRRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]} , "/*"]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::CountwiseRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]} , "/*"]]}, 
+						   {"Fn::Join": ["",  [ "arn:aws:s3:::KronosRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}  , "/*"]]}, 
+						 ]
+					 } ]
+				},
+      "Roles": [ { "Ref": "IamRole" } ]
+			}
+		},
 		"IamRole": {
 			"Type": "AWS::IAM::Role",
 			"Properties": {
@@ -117,9 +153,11 @@
 				"IamInstanceProfile": { "Ref": "InstanceProfile"},
 				"ImageId": { "Ref": "AMI"},
 				"InstanceType": { "Ref": "InstanceType"},
-				"KeyName": { "Ref": "KeyName"},
+				"KeyName":  { "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"SshKey" ]},
 				"Monitoring": "false",
-				"SecurityGroupIds": [ {"Ref": "SecurityGroupIdDataPipe"}, { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]}],
+				"SecurityGroupIds": {
+					"Fn::Split": [ ",", { "Fn::Sub": [ "${idList},${SecurityGroup1}", { "idList": { "Fn::Join": [ ",", { "Ref": "SecurityGroupIdsDefault" } ] } } ] } ]
+				},
 				"SubnetId": { "Ref": "SubnetId"},
 				"Tags": [
 				{
@@ -143,7 +181,7 @@
 					{
 						"DeviceName" : "/dev/sda1",
 						"Ebs" : {
-							"DeleteOnTermination" : "false",
+							"DeleteOnTermination" : { "Ref": "VolumeDeleteOnInstanceTermination" },
 							"VolumeType" : "gp2",
 							"VolumeSize" : { "Ref": "RootVolumeSize" }
 						}
@@ -151,7 +189,7 @@
 					{
 						"DeviceName" : "/dev/sdf",
 						"Ebs" : {
-							"DeleteOnTermination" : "false",
+							"DeleteOnTermination" : { "Ref": "VolumeDeleteOnInstanceTermination" },
 							"Encrypted": true,
 							"VolumeType" : "gp2",
 							"VolumeSize" : { "Ref": "AppVolumeSize" }
@@ -159,19 +197,61 @@
 					}
 				],
 				"UserData" :{ "Fn::Base64" : { "Fn::Join" : ["", [
-					"#!/bin/bash -xe\n"
+					"#!/bin/bash -xe\n",
+					"exec > >(tee /var/tmp/userdata.log|logger -t userdata ) 2>&1\n",
+					"#create users with root privs\n",
+					"for i in apathros ; do\n",
+					"  useradd -m -G ssh_access $i\n",
+					"  user_created=$(id -u $i > /dev/null 2>&1; echo $?)\n",
+					"   mkdir -p /home/$i/.ssh\n",
+					"   touch /home/$i/.ssh/authorized_keys\n",
+					"   chown -R $i:$i /home/$i/.ssh\n",
+					"   chmod 700 /home/$i/.ssh\n",
+					"   chmod 600 /home/$i/.ssh/authorized_keys\n",
+					"   echo \"$i ALL=(ALL) NOPASSWD: ALL\" >> /etc/sudoers\n",
+					"done\n",
+					"  echo \"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key\" >> /home/apathros/.ssh/authorized_keys\n",
+					"\n",
+					"# Set Timezone\n",
+					"timedatectl set-timezone America/New_York\n",
+					"\n",
+					"yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional\n",
+					"yum update -y\n",
+					"yum install zip unzip bind-utils traceroute lvm2 wget -y\n",
+					"yum install nvme-cli -y\n",
+					"\n",
+					"\n",
+					"# Install SSM Agent\n",
+					"cd /tmp\n",
+					"yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm\n",
+					"systemctl enable amazon-ssm-agent\n",
+					"systemctl start amazon-ssm-agent\n",
+					"\n",
+					"#Install AWS CLI\n",
+					"cd /tmp\n",
+					"curl \"https://s3.amazonaws.com/aws-cli/awscli-bundle.zip\" -o \"awscli-bundle.zip\"\n",
+					"unzip awscli-bundle.zip\n",
+					"./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws\n",
+					"\n",
+					"#Install cloudwatch monitoring scripts\n",
+					"yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https perl-Digest-SHA --enablerepo=\"rhui-REGION-rhel-server-optional\" -y\n",
+					"cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.2.zip -O ; unzip CloudWatchMonitoringScripts-1.2.2.zip && rm CloudWatchMonitoringScripts-1.2.2.zip && cd aws-scripts-mon\n",
+					"\n",
+					"# Set Hostname\n",
+					"hostnamectl set-hostname $(/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text)\n",
+					"#reboot"
 					]
-					]
+						]
+				}
 				}
 			}
-		}
 		},
 		"SecurityGroup1": {
 			"Type": "AWS::EC2::SecurityGroup",
 			"Properties": {
 				"GroupName" : { "Ref": "SecurityGroup1Name" },
 				"GroupDescription" : {"Fn::Join": ["-",  [{ "Ref": "SecurityGroup1Description" } , { "Ref": "Environment" }]]},
-				"VpcId": { "Ref": "VpcId" },
+				"VpcId":  { "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"VpcId" ]},
 				"Tags": [
 				{
 					"Key": "Application",

@@ -24,6 +24,10 @@
 		"ParameterValue": "true"
 	},
 	{
+		"ParameterKey": "VolumeDeleteOnInstanceTermination",
+		"ParameterValue": "true"
+	},
+	{
 		"ParameterKey": "Environment",
 		"ParameterValue": "dev"
 	},
@@ -33,11 +37,7 @@
 	},
 	{
 		"ParameterKey": "InstanceType",
-		"ParameterValue": "r5.xlarge"
-	},
-	{
-		"ParameterKey": "KeyName",
-		"ParameterValue": "apathros"
+		"ParameterValue": "r5.large"
 	},
 	{
 		"ParameterKey": "OS",
@@ -56,15 +56,11 @@
 		"ParameterValue": "RStudioDev"
 	},
 	{
-		"ParameterKey": "SecurityGroupIdDataPipe",
-		"ParameterValue": "sg-b503cac9"
+		"ParameterKey": "SecurityGroupIdsDefault",
+		"ParameterValue": "sg-b503cac9,sg-9a579ce5"
 	},
 	{
 		"ParameterKey": "SubnetId",
 		"ParameterValue": "subnet-0bad1c26"
-	},
-	{
-		"ParameterKey": "VpcId",
-		"ParameterValue": "vpc-6057bd06"
 	}
 ]
