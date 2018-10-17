@@ -58,7 +58,7 @@
 		},
 		"RootVolumeSize": {
 			"Type": "Number",
-			"Description": "The root volume size in Gigs, eg. 50 "
+			"Description": "The root volume size in Gigs, eg. 100 "
 		},
 		"AppVolumeSize": {
 			"Type": "Number",
@@ -82,10 +82,10 @@
 	},
 	"Mappings": {
 		"EnvironmentMap": {
-			"dev": { "AMI": "ami-0e524e75" , "VpcId": "vpc-6057bd06" ,"SshKey": "tco-nonproduction", "InitCap": "Dev" },
-			"qa": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "tco-nonproduction", "InitCap": "Qa" },
-			"poc": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "apathros", "InitCap": "Poc" },
-			"prod": { "AMI": "ami-d59aa3af", "VpcId" :"vpc-f4682392", "SshKey": "tco-production", "InitCap": "Prod" }
+			"dev": { "AMI": "ami-0e524e75" , "VpcId": "vpc-6057bd06" ,"SshKey": "tco-nonproduction" },
+			"qa": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "tco-nonproduction" },
+			"poc": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "apathros" },
+			"prod": { "AMI": "ami-d59aa3af", "VpcId" :"vpc-f4682392", "SshKey": "tco-production" }
 		}
 	},
 	"Conditions" : { 
@@ -137,7 +137,7 @@
 						"Action": [ "sts:AssumeRole" ]
 					} ]
 				},
-				"ManagedPolicyArns": ["arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess","arn:aws:iam::869052972610:policy/TCO_SSM_Policy_For_EC2","arn:aws:iam::869052972610:policy/EBS_Snapshots" ]
+				"ManagedPolicyArns": ["arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess",{ "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:policy/TCO_SSM_Policy_For_EC2" },{ "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:policy/EBS_Snapshots"} ]
 			}
 		},
 		"InstanceProfile": {
