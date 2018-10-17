@@ -82,10 +82,10 @@
 	},
 	"Mappings": {
 		"EnvironmentMap": {
-			"dev": { "AMI": "ami-0e524e75" , "VpcId": "vpc-6057bd06" ,"SshKey": "tco-nonproduction", "CamelCase": "Dev" },
-			"qa": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "tco-nonproduction", "CamelCase": "Qa" },
-			"poc": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "apathros", "CamelCase": "Poc" },
-			"prod": { "AMI": "ami-d59aa3af", "VpcId" :"vpc-f4682392", "SshKey": "tco-production", "CamelCase": "Prod" }
+			"dev": { "AMI": "ami-0e524e75" , "VpcId": "vpc-6057bd06" ,"SshKey": "tco-nonproduction", "InitCap": "Dev" },
+			"qa": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "tco-nonproduction", "InitCap": "Qa" },
+			"poc": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "apathros", "InitCap": "Poc" },
+			"prod": { "AMI": "ami-d59aa3af", "VpcId" :"vpc-f4682392", "SshKey": "tco-production", "InitCap": "Prod" }
 		}
 	},
 	"Resources": {
@@ -104,16 +104,16 @@
 							 "s3:ListObjects"
 						 ],
 						 "Resource" : [
-						   { "Fn::Join": ["",  [ "arn:aws:s3:::PeopleSoftRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::HyperionRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::EDWRRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::CountwiseRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::KronosRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}]]}, 
-						   { "Fn::Join": ["",  [ "arn:aws:s3:::PeopleSoftRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}, "/*"]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::HyperionRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]} , "/*"]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::EDWRRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]} , "/*"]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::CountwiseRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]} , "/*"]]}, 
-						   {"Fn::Join": ["",  [ "arn:aws:s3:::KronosRStudio"  ,{"Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"CamelCase" ]}  , "/*"]]}, 
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::peoplesoft","rstudio",{"Ref" : "Environment"}]]}, 
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::hyperion"  ,"rstudio",{"Ref" : "Environment"}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::edwr"  ,"rstudio",{"Ref" : "Environment"}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::countwise"  ,"rstudio",{"Ref" : "Environment"}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::kronos"  ,"rstudio",{"Ref" : "Environment"}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::peoplesoft"  ,"rstudio",{ "Fn::Join": ["", [{"Ref" : "Environment"}, "/*"]]}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::hyperion"  ,"rstudio",{ "Fn::Join": ["", {"Ref" : "Environment"}, "/*"]]}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::edwr"  ,"rstudio",{ "Fn::Join": ["", {"Ref" : "Environment"}, "/*"]]}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::countwise"  ,"rstudio",{ "Fn::Join": ["", {"Ref" : "Environment"}, "/*"]]}]]},
+						   { "Fn::Join": ["-",  [ "arn:aws:s3:::kronos"  ,"rstudio",{ "Fn::Join": ["", {"Ref" : "Environment"}, "/*"]]}]]}
 						 ]
 					 } ]
 				},
@@ -200,7 +200,7 @@
 					"#!/bin/bash -xe\n",
 					"exec > >(tee /var/tmp/userdata.log|logger -t userdata ) 2>&1\n",
 					"#create users with root privs\n",
-					"for i in apathros ; do\n",
+					"for i in apathros vsirigir ; do\n",
 					"  useradd -m -G ssh_access $i\n",
 					"  user_created=$(id -u $i > /dev/null 2>&1; echo $?)\n",
 					"   mkdir -p /home/$i/.ssh\n",
@@ -237,6 +237,8 @@
 					"yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https perl-Digest-SHA --enablerepo=\"rhui-REGION-rhel-server-optional\" -y\n",
 					"cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.2.zip -O ; unzip CloudWatchMonitoringScripts-1.2.2.zip && rm CloudWatchMonitoringScripts-1.2.2.zip && cd aws-scripts-mon\n",
 					"\n",
+					"#Install packages for AD\n",
+					"yum -y install sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools\n",
 					"# Set Hostname\n",
 					"hostnamectl set-hostname $(/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text)\n",
 					"reboot"

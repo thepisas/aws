@@ -21,7 +21,7 @@
 	},
 	{
 		"ParameterKey": "EnableInstanceTerminationProtection",
-		"ParameterValue": "true"
+		"ParameterValue": "false"
 	},
 	{
 		"ParameterKey": "VolumeDeleteOnInstanceTermination",
