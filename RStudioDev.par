@@ -21,11 +21,11 @@
 	},
 	{
 		"ParameterKey": "EnableInstanceTerminationProtection",
-		"ParameterValue": "false"
+		"ParameterValue": "true"
 	},
 	{
 		"ParameterKey": "VolumeDeleteOnInstanceTermination",
-		"ParameterValue": "true"
+		"ParameterValue": "false"
 	},
 	{
 		"ParameterKey": "Environment",
@@ -33,11 +33,11 @@
 	},
 	{
 		"ParameterKey": "Hostname",
-		"ParameterValue": "poc-amzrstdev01"
+		"ParameterValue": "amzrstdev01"
 	},
 	{
 		"ParameterKey": "InstanceType",
-		"ParameterValue": "r5.large"
+		"ParameterValue": "r5.xlarge"
 	},
 	{
 		"ParameterKey": "OS",
@@ -46,6 +46,14 @@
 	{
 		"ParameterKey": "RootVolumeSize",
 		"ParameterValue": "100"
+	},
+	{
+		"ParameterKey": "EbsKmsKeyId",
+		"ParameterValue": "arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f"
+	},
+	{
+		"ParameterKey": "EbsVolumeType",
+		"ParameterValue": "gp2"
 	},
 	{
 		"ParameterKey": "SecurityGroup1Description",
