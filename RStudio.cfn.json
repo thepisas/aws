@@ -44,7 +44,7 @@
 		},
 		"Hostname": {
 			"Type": "String",
-			"Description": "The value of Tag Key:Name, e.g. poc-amzrstdev01"
+			"Description": "The value of Tag Key:Name, e.g. amzrstdev01"
 		},
 		"OS": {
 			"Type": "String",
@@ -58,7 +58,7 @@
 		},
 		"RootVolumeSize": {
 			"Type": "Number",
-			"Description": "The root volume size in Gigs, eg. 100 "
+			"Description": "The root volume size in Gigs, eg. 128 "
 		},
 		"AppVolumeSize": {
 			"Type": "Number",
@@ -90,10 +90,10 @@
 	},
 	"Mappings": {
 		"EnvironmentMap": {
-			"dev": { "AMI": "ami-0e524e75" , "VpcId": "vpc-6057bd06" ,"SshKey": "TCO-NONPROD" },
-			"qa": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD" },
-			"poc": { "AMI": "ami-0e524e75", "VpcId": "vpc-6057bd06", "SshKey": "apathros" },
-			"prod": { "AMI": "ami-d59aa3af", "VpcId" :"vpc-f4682392", "SshKey": "TCO-PROD" }
+			"dev": { "VpcId": "vpc-6057bd06" ,"SshKey": "TCO-NONPROD" , "InitCap": "Dev" },
+			"qa": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Qa" }, 
+			"poc": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Poc" },
+			"prod": { "VpcId" :"vpc-f4682392", "SshKey": "TCO-PROD", "InitCap": "Prod" }
 		},
 		"VolumeResourceDeletionMap": {
 			"true": { "Policy" : "Delete" },
@@ -104,10 +104,11 @@
 		"IfProd" : {"Fn::Equals" : [{"Ref" : "Environment"}, "prod"]}
 	},
 	"Resources": {
-		"IamPolicy": {
-			"Type" : "AWS::IAM::Policy",
+		"Ec2S3AccessIamManagedPolicy": {
+			"Type" : "AWS::IAM::ManagedPolicy",
+			"Description" : "AWS::IAM::ManagedPolicy",
 			"Properties" : {
-				"PolicyName" : "Ec2S3AccessRStudioDevPolicy",
+				"ManagedPolicyName" : { "Fn::Join": ["",  [ "Ec2S3Access",{"Ref" : "Application"},{ "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"InitCap" ]},"Policy"]]},
 				"PolicyDocument" : {
 					"Version" : "2012-10-17",
 					 "Statement": [ {
@@ -158,7 +159,7 @@
 				"Roles": [ { "Ref": "IamRole"} ],
 				"InstanceProfileName": {"Fn::Join": ["-",  [{ "Ref": "Hostname" } ,{ "Ref": "Ec2InstanceRoleName" }]]}
 				}
-			},
+		},
 		"Ec2Instance": {
 			"Type": "AWS::EC2::Instance",
 			"Properties": {
@@ -250,7 +251,10 @@
 					"#Install packages for AD\n",
 					"yum install -y sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools\n",
 					"# Set Hostname\n",
-					"hostnamectl set-hostname $(/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text)\n",
+					"region=\"us-east-1\"\n",
+					"ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)\n",
+					"host_name=$(/usr/local/bin/aws ec2 --region ${region}  describe-tags --filters Name=resource-id,Values=${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)\n",
+					"hostnamectl set-hostname ${host_name}\n",
 					"reboot"
 					]
 						]
@@ -585,10 +589,13 @@
               "Condition": {
                 "StringNotEquals": {
                   "aws:sourceVpce": [
-                    "vpce-15c7087c",
-                    "vpce-f0834f99",
-                    "vpce-8d72bae4"
-                  ]
+										{ "Fn::If" : [
+												"IfProd",
+													"vpce-8d72bae4",
+													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+											]
+										}
+									]
                 }
               }
 						}
@@ -650,10 +657,13 @@
               "Condition": {
                 "StringNotEquals": {
                   "aws:sourceVpce": [
-                    "vpce-15c7087c",
-                    "vpce-f0834f99",
-                    "vpce-8d72bae4"
-                  ]
+										{ "Fn::If" : [
+												"IfProd",
+													"vpce-8d72bae4",
+													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+											]
+										}
+									]
                 }
               }
 						}
@@ -715,10 +725,13 @@
               "Condition": {
                 "StringNotEquals": {
                   "aws:sourceVpce": [
-                    "vpce-15c7087c",
-                    "vpce-f0834f99",
-                    "vpce-8d72bae4"
-                  ]
+										{ "Fn::If" : [
+												"IfProd",
+													"vpce-8d72bae4",
+													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+											]
+										}
+									]
                 }
               }
 						}
@@ -780,10 +793,13 @@
               "Condition": {
                 "StringNotEquals": {
                   "aws:sourceVpce": [
-                    "vpce-15c7087c",
-                    "vpce-f0834f99",
-                    "vpce-8d72bae4"
-                  ]
+										{ "Fn::If" : [
+												"IfProd",
+													"vpce-8d72bae4",
+													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+											]
+										}
+									]
                 }
               }
 						}
@@ -845,10 +861,13 @@
               "Condition": {
                 "StringNotEquals": {
                   "aws:sourceVpce": [
-                    "vpce-15c7087c",
-                    "vpce-f0834f99",
-                    "vpce-8d72bae4"
-                  ]
+										{ "Fn::If" : [
+												"IfProd",
+													"vpce-8d72bae4",
+													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+												]
+										}
+									]
                 }
               }
 						}
