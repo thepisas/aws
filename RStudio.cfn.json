@@ -101,7 +101,9 @@
 		}
 	},
 	"Conditions" : { 
-		"IfProd" : {"Fn::Equals" : [{"Ref" : "Environment"}, "prod"]}
+		"IfProd" : {"Fn::Equals" : [{"Ref" : "Environment"}, "prod"]},
+		"IfNotProd" : {"Fn::Not" : [{"Fn::Equals" : [{"Ref" : "Environment"}, "prod" ]}]},
+		"IfQa" : {"Fn::Not" : [{"Fn::Equals" : [{"Ref" : "Environment"}, "prod" ]}]}
 	},
 	"Resources": {
 		"Ec2S3AccessIamManagedPolicy": {
@@ -874,6 +876,529 @@
 					]
         }
 			}
+		},
+		"Ec2S3AccessIamManagedPolicyQa": {
+			"Type" : "AWS::IAM::ManagedPolicy",
+			"Condition" : "IfQa",
+			"Description" : "AWS::IAM::ManagedPolicy",
+			"Properties" : {
+				"ManagedPolicyName" : { "Fn::Join": ["",  [ "Ec2S3Access",{"Ref" : "Application"},{ "Fn::FindInMap" : [ "EnvironmentMap", "qa","InitCap" ]},"Policy"]]},
+				"PolicyDocument" : {
+					"Version" : "2012-10-17",
+					"Statement": [ {
+						"Effect"   : "Allow",
+						"Action"   : [ 
+							"s3:PutObject",
+						"s3:GetObject",
+						"s3:ListBucket",
+						"s3:ListObjects"
+							],
+						"Resource" : [
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::peoplesoft","rstudio","qa"]]}, 
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::hyperion"  ,"rstudio","qa"]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::edwr"  ,"rstudio","qa"]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::countwise"  ,"rstudio","qa"]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::kronos"  ,"rstudio","qa"]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::peoplesoft"  ,"rstudio",{ "Fn::Join": ["", ["qa", "/*"]]}]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::hyperion"  ,"rstudio",{ "Fn::Join": ["", ["qa", "/*"]]}]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::edwr"  ,"rstudio",{ "Fn::Join": ["", ["qa", "/*"]]}]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::countwise"  ,"rstudio",{ "Fn::Join": ["", ["qa", "/*"]]}]]},
+						{ "Fn::Join": ["-",  [ "arn:aws:s3:::kronos"  ,"rstudio",{ "Fn::Join": ["", ["qa", "/*"]]}]]}
+						]
+					} ]
+				},
+				"Roles": [ { "Ref": "IamRole" } ]
+			}
+		},
+	 "s3peoplesoftQa": {
+		"Type": "AWS::S3::Bucket",
+		"Condition" : "IfQa",
+		"Properties": {
+			"BucketName" : { "Fn::Join": ["-",  [ "peoplesoft","rstudio","qa"]]},  
+			"LoggingConfiguration": {
+				"Fn::If": [
+					"IfProd",
+					{
+						"DestinationBucketName": "amzs3edhprodlogs",
+						"LogFilePrefix": "s3logs/"
+					},
+					{
+						"Ref" : "AWS::NoValue"
+					}  
+				]
+			},
+			"AccessControl": "Private",
+			"VersioningConfiguration": {
+				"Status": "Suspended"
+			},
+			"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+			]
 		}
+	},
+	 "s3hyperionQa": {
+		"Type": "AWS::S3::Bucket",
+		"Condition" : "IfQa",
+		"Properties": {
+			"BucketName" : { "Fn::Join": ["-",  [ "hyperion","rstudio","qa"]]}, 
+			"LoggingConfiguration": {
+				"Fn::If": [
+					"IfProd",
+					{
+						"DestinationBucketName": "amzs3edhprodlogs",
+						"LogFilePrefix": "s3logs/"
+					},
+					{
+						"Ref" : "AWS::NoValue"
+					}  
+				]
+			},
+			"AccessControl": "Private",
+			"VersioningConfiguration": {
+				"Status": "Suspended"
+			},
+			"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+			]
+		}
+	},
+	 "s3edwrQa": {
+		"Type": "AWS::S3::Bucket",
+		"Condition" : "IfQa",
+		"Properties": {
+			"BucketName" : { "Fn::Join": ["-",  [ "edwr","rstudio","qa"]]}, 
+			"LoggingConfiguration": {
+				"Fn::If": [
+					"IfProd",
+					{
+						"DestinationBucketName": "amzs3edhprodlogs",
+						"LogFilePrefix": "s3logs/"
+					},
+					{
+						"Ref" : "AWS::NoValue"
+					}  
+				]
+			},
+			"AccessControl": "Private",
+			"VersioningConfiguration": {
+				"Status": "Suspended"
+			},
+			"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+			]
+		}
+	},
+	 "s3countwiseQa": {
+		"Type": "AWS::S3::Bucket",
+		"Condition" : "IfQa",
+		"Properties": {
+			"BucketName" : { "Fn::Join": ["-",  [ "countwise"  ,"rstudio","qa"]]}, 
+			"LoggingConfiguration": {
+				"Fn::If": [
+					"IfProd",
+					{
+						"DestinationBucketName": "amzs3edhprodlogs",
+						"LogFilePrefix": "s3logs/"
+					},
+					{
+						"Ref" : "AWS::NoValue"
+					}  
+				]
+			},
+			"AccessControl": "Private",
+			"VersioningConfiguration": {
+				"Status": "Suspended"
+			},
+			"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+			]
+		}
+	},
+	 "s3kronosQa": {
+		"Type": "AWS::S3::Bucket",
+		"Condition" : "IfQa",
+		"Properties": {
+			"BucketName" : { "Fn::Join": ["-",  [ "kronos"  ,"rstudio","qa"]]}, 
+			"LoggingConfiguration": {
+				"Fn::If": [
+					"IfProd",
+					{
+						"DestinationBucketName": "amzs3edhprodlogs",
+						"LogFilePrefix": "s3logs/"
+					},
+					{
+						"Ref" : "AWS::NoValue"
+					}  
+				]
+			},
+			"AccessControl": "Private",
+			"VersioningConfiguration": {
+				"Status": "Suspended"
+			},
+			"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+			]
+		}
+	},
+	"s3PolicyPeoplesoftQa": {
+		"Type": "AWS::S3::BucketPolicy",
+		"Condition" : "IfQa",
+		"Properties": {
+			"Bucket": {
+				"Ref": "s3peoplesoftQa"
+			},
+			"PolicyDocument": {
+				"Version": "2012-10-17",
+				"Id": "PutObjPolicy",
+				"Statement": [
+					{
+						"Sid": "DenyIncorrectEncryptionHeader",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3peoplesoftQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"StringNotEquals": {
+								"s3:x-amz-server-side-encryption": "AES256"
+							}
+						}
+					},
+					{
+						"Sid": "DenyUnEncryptedObjectUploads",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3peoplesoftQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"Null": {
+								"s3:x-amz-server-side-encryption": "true"
+							}
+						}
+					},
+					{
+						"Sid": "Access-to-specific-VPCE-only",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": [
+							"s3:GetObject*",
+							"s3:PutObject*",
+							"s3:DeleteObject*"
+						],
+						"Resource": [
+							{ "Fn::GetAtt": [ "s3peoplesoftQa", "Arn" ] },
+							{ "Fn::Sub": [ "${arn}/*" ,{ "arn" : {"Fn::GetAtt": [ "s3peoplesoftQa", "Arn" ] } } ] }
+						],
+						"Condition": {
+							"StringNotEquals": {
+								"aws:sourceVpce": [
+									{ "Fn::If" : [
+											"IfProd",
+												"vpce-8d72bae4",
+												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+										]
+									}
+								]
+							}
+						}
+					}
+				]
+			}
+		}
+	},
+	"s3PolicyHyperionQa": {
+		"Type": "AWS::S3::BucketPolicy",
+		"Condition" : "IfQa",
+		"Properties": {
+			"Bucket": {
+				"Ref": "s3hyperionQa"
+			},
+			"PolicyDocument": {
+				"Version": "2012-10-17",
+				"Id": "PutObjPolicy",
+				"Statement": [
+					{
+						"Sid": "DenyIncorrectEncryptionHeader",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3hyperionQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"StringNotEquals": {
+								"s3:x-amz-server-side-encryption": "AES256"
+							}
+						}
+					},
+					{
+						"Sid": "DenyUnEncryptedObjectUploads",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3hyperionQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"Null": {
+								"s3:x-amz-server-side-encryption": "true"
+							}
+						}
+					},
+					{
+						"Sid": "Access-to-specific-VPCE-only",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": [
+							"s3:GetObject*",
+							"s3:PutObject*",
+							"s3:DeleteObject*"
+						],
+						"Resource": [
+							{ "Fn::GetAtt": [ "s3hyperionQa", "Arn" ] },
+							{ "Fn::Sub": [ "${arn}/*" ,{ "arn" : {"Fn::GetAtt": [ "s3hyperionQa", "Arn" ] } } ] }
+						],
+						"Condition": {
+							"StringNotEquals": {
+								"aws:sourceVpce": [
+									{ "Fn::If" : [
+											"IfProd",
+												"vpce-8d72bae4",
+												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+										]
+									}
+								]
+							}
+						}
+					}
+				]
+			}
+		}
+	},
+	"s3PolicyEdwrQa": {
+		"Type": "AWS::S3::BucketPolicy",
+		"Condition" : "IfQa",
+		"Properties": {
+			"Bucket": {
+				"Ref": "s3edwrQa"
+			},
+			"PolicyDocument": {
+				"Version": "2012-10-17",
+				"Id": "PutObjPolicy",
+				"Statement": [
+					{
+						"Sid": "DenyIncorrectEncryptionHeader",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3edwrQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"StringNotEquals": {
+								"s3:x-amz-server-side-encryption": "AES256"
+							}
+						}
+					},
+					{
+						"Sid": "DenyUnEncryptedObjectUploads",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3edwrQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"Null": {
+								"s3:x-amz-server-side-encryption": "true"
+							}
+						}
+					},
+					{
+						"Sid": "Access-to-specific-VPCE-only",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": [
+							"s3:GetObject*",
+							"s3:PutObject*",
+							"s3:DeleteObject*"
+						],
+						"Resource": [
+							{ "Fn::GetAtt": [ "s3edwrQa", "Arn" ] },
+							{ "Fn::Sub": [ "${arn}/*" ,{ "arn" : {"Fn::GetAtt": [ "s3edwrQa", "Arn" ] } } ] }
+						],
+						"Condition": {
+							"StringNotEquals": {
+								"aws:sourceVpce": [
+									{ "Fn::If" : [
+											"IfProd",
+												"vpce-8d72bae4",
+												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+										]
+									}
+								]
+							}
+						}
+					}
+				]
+			}
+		}
+	},
+	"s3PolicyCountwiseQa": {
+		"Type": "AWS::S3::BucketPolicy",
+		"Condition" : "IfQa",
+		"Properties": {
+			"Bucket": {
+				"Ref": "s3countwiseQa"
+			},
+			"PolicyDocument": {
+				"Version": "2012-10-17",
+				"Id": "PutObjPolicy",
+				"Statement": [
+					{
+						"Sid": "DenyIncorrectEncryptionHeader",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3countwiseQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"StringNotEquals": {
+								"s3:x-amz-server-side-encryption": "AES256"
+							}
+						}
+					},
+					{
+						"Sid": "DenyUnEncryptedObjectUploads",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3countwiseQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"Null": {
+								"s3:x-amz-server-side-encryption": "true"
+							}
+						}
+					},
+					{
+						"Sid": "Access-to-specific-VPCE-only",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": [
+							"s3:GetObject*",
+							"s3:PutObject*",
+							"s3:DeleteObject*"
+						],
+						"Resource": [
+							{ "Fn::GetAtt": [ "s3countwiseQa", "Arn" ] },
+							{ "Fn::Sub": [ "${arn}/*" ,{ "arn" : {"Fn::GetAtt": [ "s3countwiseQa", "Arn" ] } } ] }
+						],
+						"Condition": {
+							"StringNotEquals": {
+								"aws:sourceVpce": [
+									{ "Fn::If" : [
+											"IfProd",
+												"vpce-8d72bae4",
+												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+										]
+									}
+								]
+							}
+						}
+					}
+				]
+			}
+		}
+	},
+	"s3PolicyKronosQa": {
+		"Type": "AWS::S3::BucketPolicy",
+		"Condition" : "IfQa",
+		"Properties": {
+			"Bucket": {
+				"Ref": "s3kronosQa"
+			},
+			"PolicyDocument": {
+				"Version": "2012-10-17",
+				"Id": "PutObjPolicy",
+				"Statement": [
+					{
+						"Sid": "DenyIncorrectEncryptionHeader",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3kronosQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"StringNotEquals": {
+								"s3:x-amz-server-side-encryption": "AES256"
+							}
+						}
+					},
+					{
+						"Sid": "DenyUnEncryptedObjectUploads",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": "s3:PutObject",
+						"Resource": {
+							"Fn::Join": [ "", [{"Fn::GetAtt": [ "s3kronosQa", "Arn" ]},"/*" ]]
+						},
+						"Condition": {
+							"Null": {
+								"s3:x-amz-server-side-encryption": "true"
+							}
+						}
+					},
+					{
+						"Sid": "Access-to-specific-VPCE-only",
+						"Effect": "Deny",
+						"Principal": "*",
+						"Action": [
+							"s3:GetObject*",
+							"s3:PutObject*",
+							"s3:DeleteObject*"
+						],
+						"Resource": [
+							{ "Fn::GetAtt": [ "s3kronosQa", "Arn" ] },
+							{ "Fn::Sub": [ "${arn}/*" ,{ "arn" : {"Fn::GetAtt": [ "s3kronosQa", "Arn" ] } } ] }
+						],
+						"Condition": {
+							"StringNotEquals": {
+								"aws:sourceVpce": [
+									{ "Fn::If" : [
+											"IfProd",
+												"vpce-8d72bae4",
+												 "[\"vpce-15c7087c\",\"vpce-f0834f99\"]"
+											]
+									}
+								]
+							}
+						}
+					}
+				]
+			}
+		}
+	}
 	}
 }

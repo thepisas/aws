@@ -27,7 +27,7 @@ $input_scalar=join("",@input_array);
 #Application	RStudio
 print ($input_scalar);
 #$search_regex='(.*?)\s+(\S+)\n';
-$search_regex='\"';
+$search_regex='(\"Type.*?\",\n)';
 #$replace_str='';  #note: if the string to be replaced contains $1 $2 etc., they are replaced literally as $1 and $2 instead of the grouping that you want want; it doesn't seem that there's a work around for this
 
 # '%' is used as delimiters ; $1 represent first grouping, $2 represents 2nd grouping, the final 'm' is needed to do multiline matching
@@ -38,7 +38,7 @@ $search_regex='\"';
 #$input_scalar =~ s%$search_regex%{\n  \"ParameterKey\": \"$1\",\n  \"ParameterValue\": \"$2\"\n},\n%g; 
 #replace " with \"
 #replace " with \"
-$input_scalar =~s%\"%\\"%g; 
+$input_scalar =~s%$search_regex%$1      \"Condition\" : \"Ifqa\",\n%g; 
 #$input_scalar =~ s%$search_regex%$replace_str%g; 
 #$input_scalar =~ s%$search_regex%$replace_str%sg; #same effect as above ; note . by default matches any char other than \n , but 's' at the end modifes that behavior to have . match \n as well
 
