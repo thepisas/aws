@@ -209,7 +209,7 @@
 					"#!/bin/bash -xe\n",
 					"exec > >(tee /var/tmp/userdata.log|logger -t userdata ) 2>&1\n",
 					"#create users with root privs\n",
-					"for i in apathros vsirigir ; do\n",
+					"for i in apathros ; do\n",
 					"  useradd -m -G ssh_access $i\n",
 					"  user_created=$(id -u $i > /dev/null 2>&1; echo $?)\n",
 					"   mkdir -p /home/$i/.ssh\n",
@@ -218,9 +218,9 @@
 					"   chmod 700 /home/$i/.ssh\n",
 					"   chmod 600 /home/$i/.ssh/authorized_keys\n",
 					"   #echo \"$i ALL=(ALL) NOPASSWD: ALL\" >> /etc/sudoers\n",
+					"   chage -I -1 -m 0 -M 99999 -E -1 $i\n",
 					"done\n",
 					"  echo \"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key\" >> /home/apathros/.ssh/authorized_keys\n",
-					"   echo -e \"\nUser_Alias ADMINS=apathros,vsirigir\" >> /etc/sudoers\n",
 					"   echo -e \"\nADMINS ALL=(ALL) NOPASSWD: ALL\" >> /etc/sudoers\n",
 					"\n",
 					"# Set Timezone\n",
@@ -590,14 +590,13 @@
               ],
               "Condition": {
                 "StringNotEquals": {
-                  "aws:sourceVpce": [
+                  "aws:sourceVpce": 
 										{ "Fn::If" : [
 												"IfProd",
 													"vpce-8d72bae4",
-													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+													["vpce-15c7087c","vpce-f0834f99"]
 											]
 										}
-									]
                 }
               }
 						}
@@ -658,14 +657,13 @@
               ],
               "Condition": {
                 "StringNotEquals": {
-                  "aws:sourceVpce": [
+                  "aws:sourceVpce":
 										{ "Fn::If" : [
 												"IfProd",
 													"vpce-8d72bae4",
-													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+													["vpce-15c7087c","vpce-f0834f99"]
 											]
 										}
-									]
                 }
               }
 						}
@@ -726,14 +724,13 @@
               ],
               "Condition": {
                 "StringNotEquals": {
-                  "aws:sourceVpce": [
+                  "aws:sourceVpce":
 										{ "Fn::If" : [
 												"IfProd",
 													"vpce-8d72bae4",
-													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+													["vpce-15c7087c","vpce-f0834f99"]
 											]
 										}
-									]
                 }
               }
 						}
@@ -794,14 +791,13 @@
               ],
               "Condition": {
                 "StringNotEquals": {
-                  "aws:sourceVpce": [
+                  "aws:sourceVpce":
 										{ "Fn::If" : [
 												"IfProd",
 													"vpce-8d72bae4",
-													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+													["vpce-15c7087c","vpce-f0834f99"]
 											]
 										}
-									]
                 }
               }
 						}
@@ -862,14 +858,13 @@
               ],
               "Condition": {
                 "StringNotEquals": {
-                  "aws:sourceVpce": [
+                  "aws:sourceVpce":
 										{ "Fn::If" : [
 												"IfProd",
 													"vpce-8d72bae4",
-													 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+													["vpce-15c7087c","vpce-f0834f99"]
 												]
 										}
-									]
                 }
               }
 						}
@@ -1109,14 +1104,13 @@
 						],
 						"Condition": {
 							"StringNotEquals": {
-								"aws:sourceVpce": [
+								"aws:sourceVpce":
 									{ "Fn::If" : [
 											"IfProd",
 												"vpce-8d72bae4",
-												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+												["vpce-15c7087c","vpce-f0834f99"]
 										]
 									}
-								]
 							}
 						}
 					}
@@ -1178,14 +1172,13 @@
 						],
 						"Condition": {
 							"StringNotEquals": {
-								"aws:sourceVpce": [
+								"aws:sourceVpce":
 									{ "Fn::If" : [
 											"IfProd",
 												"vpce-8d72bae4",
-												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+												["vpce-15c7087c","vpce-f0834f99"]
 										]
 									}
-								]
 							}
 						}
 					}
@@ -1247,14 +1240,13 @@
 						],
 						"Condition": {
 							"StringNotEquals": {
-								"aws:sourceVpce": [
+								"aws:sourceVpce":
 									{ "Fn::If" : [
 											"IfProd",
 												"vpce-8d72bae4",
-												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+												["vpce-15c7087c","vpce-f0834f99"]
 										]
 									}
-								]
 							}
 						}
 					}
@@ -1316,14 +1308,13 @@
 						],
 						"Condition": {
 							"StringNotEquals": {
-								"aws:sourceVpce": [
+								"aws:sourceVpce":
 									{ "Fn::If" : [
 											"IfProd",
 												"vpce-8d72bae4",
-												 { "Fn::Join" : [ "\n", ["vpce-15c7087c","vpce-f0834f99"]]}
+												["vpce-15c7087c","vpce-f0834f99"]
 										]
 									}
-								]
 							}
 						}
 					}
@@ -1385,14 +1376,13 @@
 						],
 						"Condition": {
 							"StringNotEquals": {
-								"aws:sourceVpce": [
+								"aws:sourceVpce": 
 									{ "Fn::If" : [
 											"IfProd",
 												"vpce-8d72bae4",
-												 "[\"vpce-15c7087c\",\"vpce-f0834f99\"]"
+												 ["vpce-15c7087c","vpce-f0834f99"]
 											]
 									}
-								]
 							}
 						}
 					}
