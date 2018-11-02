@@ -25,7 +25,7 @@ done
 
 ADMINS=apathros
 
-#build team users with temporary root privs during build 
+#users with temporary root privs during build 
 for i in adatta viksingh ; do
   useradd -m -G ssh_access $i
 	ADMINS="$ADMINS,$i"
@@ -34,7 +34,7 @@ done
 echo -e "\nUser_Alias ADMINS=$ADMINS" >> /etc/sudoers
 echo -e "\nADMINS ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
-# Set Timezone
+#set timezone
 timedatectl set-timezone America/New_York
 
 yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
@@ -42,14 +42,13 @@ yum update -y
 yum install zip unzip bind-utils traceroute lvm2 wget -y
 yum install nvme-cli -y
 
-
-# Install SSM Agent
+#install SSM Agent
 cd /tmp
 yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
 systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
 
-#Install AWS CLI
+#install AWS CLI
 cd /tmp
 curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
 unzip awscli-bundle.zip
@@ -57,14 +56,14 @@ unzip awscli-bundle.zip
 rm ./awscli-bundle.zip
 rm -rf ./awscli-bundle
 
-#Install cloudwatch monitoring scripts
+#install cloudwatch monitoring scripts
 yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https perl-Digest-SHA --enablerepo="rhui-REGION-rhel-server-optional" -y
 cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.2.zip -O ; unzip CloudWatchMonitoringScripts-1.2.2.zip && rm CloudWatchMonitoringScripts-1.2.2.zip && cd aws-scripts-mon
 
-#Install packages for AD
+#install packages for AD
 yum install -y sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools
 
-# Set Hostname
+#set hostname
 region="us-east-1"
 ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 host_name=$(/usr/local/bin/aws ec2 --region ${region}  describe-tags --filters Name=resource-id,Values=${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)
