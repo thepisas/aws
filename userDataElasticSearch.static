@@ -37,8 +37,9 @@ echo -e "\nADMINS ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 #set timezone
 timedatectl set-timezone America/New_York
 
-yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
 yum update -y
+
+yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
 yum install zip unzip bind-utils traceroute lvm2 wget -y
 yum install nvme-cli -y
 
@@ -64,8 +65,16 @@ cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudW
 yum install -y sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools
 
 #set hostname
+#for some reason, even though these commands seem to get executed, unless I explicitly run hostnamectl set-hostname ${host_name} again , the hostname change do not seem to take effect.
 region="us-east-1"
 ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 host_name=$(/usr/local/bin/aws ec2 --region ${region}  describe-tags --filters Name=resource-id,Values=${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)
 hostnamectl set-hostname ${host_name}
+
+# Change Hostname
+#/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text >> /tmp/newhostname.txt
+#hostnamectl set-hostname `cat /tmp/newhostname.txt`
+
+# *********NOTE: Enable password based Authentication
+#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using systemctl restart sshd
 

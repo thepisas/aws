@@ -105,8 +105,9 @@ elif [ "${software}" = "els" ] || [ "${software}" = "kib" ] || [ "${software}" =
 			svc_account=svc_esprod
    fi
 
-	 block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=${root_vol_size},VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdb,Ebs={VolumeSize=${app_vol_size},VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:${aws_account_number}:key/${kms_key_id}\"}'"
-   tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${tag_environment}},{Key=Application,Value=${tag_application}},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}},{Key=clustername,Value=elasticsearch-${environment}}]'" 
+	 block_device_mappings="'DeviceName=/dev/sda1,Ebs={VolumeSize=${root_vol_size},VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination}}','DeviceName=/dev/sdf,Ebs={VolumeSize=${app_vol_size},VolumeType=gp2,DeleteOnTermination=${ebs_delete_on_termination},Encrypted=True,KmsKeyId=\"arn:aws:kms:us-east-1:${aws_account_number}:key/${kms_key_id}\"}'"
+	 #note: this writes tags to both ec2 instance and all the ebs volumes attached to it. ON all the ebs volumes this writes a tag Key=Name with Value=hostname, post creation , edit that tag to add the mount point it,  such as amzlinelap03 /root ,  amzlinelap03 /app 
+   tag_specifications="'ResourceType=instance,Tags=[{Key=Name,Value=${hostname}},{Key=Environment,Value=${tag_environment}},{Key=Application,Value=${tag_application}},{Key=Userlogin,Value=Yes},{Key=OS,Value=${OS}},{Key=Daily-Snapshot,Value=${daily_snapshot}},{Key=clustername,Value=elasticsearch-${environment}}]' 'ResourceType=volume,Tags=[{Key=Application,Value=${tag_application}},{Key=Name,Value=${hostname}}]'" 
 else 
    echo "Invalid value entered for software ... exiting"
    exit 1
@@ -171,12 +172,8 @@ append_to_userdata_file () {
 	echo "	echo -e \"The app device/volume is \${app_device} when the expected value was ${app_device_expected}. So the filesystem and label were not created on it.\"" >> ${userdata_file}
 	echo "fi" >> ${userdata_file}
 
-	echo -e "\n#set hostname" >> ${userdata_file}
-	echo -e "region=\"us-east-1\"" >> ${userdata_file}
-	echo -e "ec2_instance_id=\$(curl -s http://169.254.169.254/latest/meta-data/instance-id)" >> ${userdata_file}
-	echo -e "host_name=\$(/usr/local/bin/aws ec2 --region \${region}  describe-tags --filters Name=resource-id,Values=\${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)" >> ${userdata_file}
-	echo -e "hcmd=\"hostnamectl set-hostname \${host_name}\"" >> ${userdata_file}
-	echo -e "eval \$hcmd" >> ${userdata_file}
+	echo -e "\n# *********NOTE:Enable password based Authentication***********" >> ${userdata_file}
+	echo -e "#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using systemctl restart sshd" >> ${userdata_file}
 	echo -e "\nreboot" >> ${userdata_file}
 
 	cat ${userdata_file}
