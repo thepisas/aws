@@ -2,6 +2,7 @@ if [ $# -ne 5 ];then
   echo -e "usage: ${BASH_SOURCE[0]} stack_name cfn_template_file parameter_file Application operation"
   echo -e "e.g ${BASH_SOURCE[0]} RStudioDev RStudio.cfn.json RStudioDev.par RStudio create"
   echo -e "e.g ${BASH_SOURCE[0]} RStudioProd RStudio.cfn.json RStudioProd.par RStudio update"
+  echo -e "e.g ${BASH_SOURCE[0]} Poc ec2.cfn.json ec2.par poc create"
   exit 1
 fi
 stack_name=${1}
@@ -17,7 +18,14 @@ elif [ ${operation} = 'update' ]; then
 else 
 	echo "Invalid value entered for operation ... exiting" ; exit 1
 fi
-echo "${cmd}"
-#echo -n "If you want to execute the above command hit ENTER"
-#read input
-eval $cmd
+
+echo -e "\n${cmd}"
+echo -n -e "\nWould you like to execute the above command? [y/n]\n"
+read input
+if [ "${input}" = "y" ] || [ "${input}" = "Y" ];then
+	echo -e "Executing the above command ..."
+	eval $cmd
+else 
+	echo -e "Exiting without executing the above command.\n"
+	exit 1
+fi

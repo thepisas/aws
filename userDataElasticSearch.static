@@ -75,6 +75,11 @@ hostnamectl set-hostname ${host_name}
 #/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text >> /tmp/newhostname.txt
 #hostnamectl set-hostname `cat /tmp/newhostname.txt`
 
+hostnamectl status
+
+#To persist the change
+echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
+
 # *********NOTE: Enable password based Authentication
-#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using systemctl restart sshd
+#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using the following command: systemctl restart sshd
 

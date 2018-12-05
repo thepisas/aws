@@ -8,10 +8,22 @@ fi
 
 mfa_code=${1}
 profile=${2}
+case "$profile" in
+    'n')
+    env=nonprod 
+    ;;
+    'p')
+    env=prod 
+    ;;
+    *)
+    echo "Invalid value entered for profile.  It must be either n or p.  Exiting ..."
+		exit 1
+esac
+
 output_dir=../output
 #output_file=${output_dir}/ec2.csv
 #replaces listString.sh or describeString.sh to String.csv
-output_file=${output_dir}/${profile}_`echo "${BASH_SOURCE[0]}"|perl -p -e 's~.*(list|describe)(.*)\.sh~$2.csv~'` #${BASH_SOURCE[0]} gives the script name ; it works when the script is invoked as  "source ./script.sh" and  as ./script.sh ; $0 works only when invoked as ./script.sh
+output_file=${output_dir}/${env}_`echo "${BASH_SOURCE[0]}"|perl -p -e 's~.*(list|describe)(.*)\.sh~$2.csv~'` #${BASH_SOURCE[0]} gives the script name ; it works when the script is invoked as  "source ./script.sh" and  as ./script.sh ; $0 works only when invoked as ./script.sh
 
 #unset the temp credentials (variables) set by MFA.sh during a previous run ; if not when you call MFA.sh,   the "aws sts get-session-token" call will be invoked with  your temp credentials  that was set by a previous run of MFA.sh , as oppossed to your permanent AWS cred and thus will error out  with "An error occurred (AccessDenied) when calling the GetSessionToken operation: Cannot call GetSessionToken with session credentials"
 source ./unsetTempCred.sh

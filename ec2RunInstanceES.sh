@@ -1,3 +1,4 @@
+#code to launch ec2 instances associated with elastic search/kibana . I used this script to scale out the elastic search clusters
 if [ $# -ne 10 ];then
   echo -e "usage:  $0 <environment> <node> <ebsvolume_delete_on_termination> <instance_type> <hostname> <enable_instance_termination_protection?> <root_vol_size> <app_vol_size> <availability_zone> <userdata_static_content_file>"
   echo -e "usage:  $0 dev bdm|ela-master|els-data true|false m5.4xlarge poc-amzlinelad04|amzlinelap04 yes|no 100 250 us-east-1b userDataElasticSearch.static"
@@ -176,7 +177,16 @@ append_to_userdata_file () {
 	echo -e "#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using systemctl restart sshd" >> ${userdata_file}
 	echo -e "\nreboot" >> ${userdata_file}
 
-	cat ${userdata_file}
+	echo -n -e "\nWould you like to see the contents of userdata in ${userdata_file} [y/n]\n"
+	read input
+	if [ "${input}" = "y" ] || [ "${input}" = "Y" ];then
+		echo -e "BEGIN ############################################"
+		echo -e "Contents of ${userdata_file}"
+		echo -e "---------------------------------------"
+		cat ${userdata_file}
+		echo -e "END ############################################"
+	fi
+
 	echo -e "\nThe label for the device mounted on ${app_device_mountpoint} is ${device_label}"
 	echo -n -e "\nThe device that will be formatted and mounted on ${app_device_mountpoint} is /dev/${app_device_expected}. You will lose all existing content on /dev/${app_device_expected} if any. Do you want to proceed [y/n]\n"
 	read i
