@@ -1,0 +1,66 @@
+[
+	{
+		"ParameterKey": "AMI",
+		"ParameterValue": "ami-0e524e75"
+	},
+	{
+		"ParameterKey": "Application",
+		"ParameterValue": "RStudio"
+	},
+	{
+		"ParameterKey": "AppVolumeSize",
+		"ParameterValue": "10"
+	},
+	{
+		"ParameterKey": "DailySnapshot",
+		"ParameterValue": "False"
+	},
+	{
+		"ParameterKey": "Ec2InstanceRoleName",
+		"ParameterValue": "Ec2RStudioDevRole"
+	},
+	{
+		"ParameterKey": "EnableInstanceTerminationProtection",
+		"ParameterValue": "false"
+	},
+	{
+		"ParameterKey": "VolumeDeleteOnInstanceTermination",
+		"ParameterValue": "true"
+	},
+	{
+		"ParameterKey": "Environment",
+		"ParameterValue": "poc"
+	},
+	{
+		"ParameterKey": "Hostname",
+		"ParameterValue": "poc-amzrst"
+	},
+	{
+		"ParameterKey": "InstanceType",
+		"ParameterValue": "m5.large"
+	},
+	{
+		"ParameterKey": "OS",
+		"ParameterValue": "RedHatLinux"
+	},
+	{
+		"ParameterKey": "RootVolumeSize",
+		"ParameterValue": "100"
+	},
+	{
+		"ParameterKey": "EbsKmsKeyId",
+		"ParameterValue": "arn:aws:kms:us-east-1:869052972610:key/cfbe4cbe-de97-4600-8d8a-7a96066acd0f"
+	},
+	{
+		"ParameterKey": "EbsVolumeType",
+		"ParameterValue": "gp2"
+	},
+	{
+		"ParameterKey": "SecurityGroupIdsDefault",
+		"ParameterValue": "sg-b503cac9,sg-9a579ce5"
+	},
+	{
+		"ParameterKey": "SubnetId",
+		"ParameterValue": "subnet-0bad1c26"
+	}
+]

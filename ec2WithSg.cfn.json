@@ -1,0 +1,319 @@
+{
+	"AWSTemplateFormatVersion": "2010-09-09",
+	"Description": "Creates EC2 instance, Security Group, SG Rules, ebs volumes",
+	"Parameters": {
+  	"Environment": {
+           "Type": "String",
+           "Default": "dev",
+           "AllowedValues" : ["dev", "qa", "stg", "prod", "poc"],
+           "Description": "The environment in which the resources are to be provisioned"
+		},
+		"EnableInstanceTerminationProtection": {
+			"Type": "String",
+			"Default": "true",
+			"AllowedValues" : ["true", "false"],
+			"Description": "Instance termination protection"
+		},
+		"VolumeDeleteOnInstanceTermination": {
+			"Type": "String",
+			"Default": "false",
+			"AllowedValues" : ["true", "false"],
+			"Description": "Delete EBS Volumes on Instance Termination"
+		},
+		"Ec2InstanceRoleName": {
+			"Type": "String",
+			"Default": "Ec2RStudioDevRole",
+			"Description": "The name of the ec2 instance role e.g. Ec2RStudioDevRole"
+		},
+		"AMI": {
+			"Type": "AWS::EC2::Image::Id",
+			"Default": "ami-0e524e75",
+			"Description": "AMI Id , e.g. ami-0e524e75 , ami-d59aa3af"
+		},
+		"InstanceType": {
+			"Type": "String",
+			"Description": "EC2 Instance Type , e.g. r5.xlarge"
+		},
+		"SubnetId": {
+			"Type": "AWS::EC2::Subnet::Id",
+			"Description": "Subnet Id, e.g. subnet-0bad1c26"
+		},
+		"Application": {
+			"Type": "String",
+			"Description": "The value of Tag Key:Application, e.g. RStudio"
+		},
+		"Hostname": {
+			"Type": "String",
+			"Description": "The value of Tag Key:Name, e.g. amzrstdev01"
+		},
+		"OS": {
+			"Type": "String",
+			"Default": "RedHatLinux",
+			"Description": "The value of Tag Key:OS, e.g. RedHatLinux"
+		},
+		"DailySnapshot": {
+			"Type": "String",
+			"Default": "True",
+			"Description": "The value of Tag Key:Daily-Snapshot, e.g. True"
+		},
+		"RootVolumeSize": {
+			"Type": "Number",
+			"Description": "The root volume size in Gigs, eg. 128 "
+		},
+		"AppVolumeSize": {
+			"Type": "Number",
+			"Description": "The app volume size in Gigs, eg. 128 "
+		},
+		"EbsKmsKeyId": {
+			"Type": "String",
+			"Description": "KMS key to be used to encrypt the volumes"
+		},
+		"EbsVolumeType": {
+			"Type": "String",
+			"Description": "EBS Volume Type , e.g. gp2"
+		},
+		"SecurityGroupIdsDefault": {
+			"Type": "List<AWS::EC2::SecurityGroup::Id>",
+			"Default": "sg-b503cac9,sg-9a579ce5",
+			"Description": "List of default Security Group Ids"
+		},
+		"SecurityGroup1Name": {
+			"Type": "String",
+			"Default": "RStudioDev",
+			"Description": "Security Group to be created for RStudio Instances"
+		},
+		"SecurityGroup1Description": {
+			"Type": "String",
+			"Default": "Security Group for RStudio Instance",
+			"Description": "Security Group description for RStudio Instances"
+		}
+	},
+	"Mappings": {
+		"EnvironmentMap": {
+			"dev": { "VpcId": "vpc-6057bd06" ,"SshKey": "TCO-NONPROD" , "InitCap": "Dev" },
+			"qa": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Qa" }, 
+			"poc": { "VpcId": "vpc-6057bd06", "SshKey": "apathros", "InitCap": "Poc" },
+			"prod": { "VpcId" :"vpc-f4682392", "SshKey": "TCO-PROD", "InitCap": "Prod" }
+		},
+		"VolumeResourceDeletionMap": {
+			"true": { "Policy" : "Delete" },
+			"false": { "Policy" : "Retain" }
+		}
+	},
+	"Conditions" : { 
+		"IfProd" : {"Fn::Equals" : [{"Ref" : "Environment"}, "prod"]},
+		"IfNotProd" : {"Fn::Not" : [{"Fn::Equals" : [{"Ref" : "Environment"}, "prod" ]}]},
+		"IfQa" : {"Fn::Not" : [{"Fn::Equals" : [{"Ref" : "Environment"}, "prod" ]}]}
+	},
+	"Resources": {
+		"InstanceProfile": {
+			"Type": "AWS::IAM::InstanceProfile",
+			"Properties": {
+				"Roles": [ { "Ref": "Ec2InstanceRoleName"} ],
+				"InstanceProfileName": {"Fn::Join": ["-",  [{ "Ref": "Hostname" } ,{ "Ref": "Ec2InstanceRoleName" }]]}
+			}
+		},
+		"Ec2Instance": {
+			"Type": "AWS::EC2::Instance",
+			"Properties": {
+				"DisableApiTermination": { "Ref": "EnableInstanceTerminationProtection"},
+				"InstanceInitiatedShutdownBehavior": "stop",
+				"EbsOptimized": "true",
+				"IamInstanceProfile": { "Ref": "InstanceProfile"},
+				"ImageId": { "Ref": "AMI"},
+				"InstanceType": { "Ref": "InstanceType"},
+				"KeyName":  { "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"SshKey" ]},
+				"Monitoring": "false",
+				"SecurityGroupIds": {
+					"Fn::Split": [ ",", { "Fn::Sub": [ "${SGIdList},${SecurityGroup1}", { "SGIdList": { "Fn::Join": [ ",", { "Ref": "SecurityGroupIdsDefault" } ] } } ] } ]
+				},
+				"SubnetId": { "Ref": "SubnetId"},
+				"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				},
+				{
+					"Key": "Name",
+					"Value": { "Ref": "Hostname"}
+				},
+				{
+					"Key": "OS",
+					"Value": { "Ref": "OS"}
+				}
+				],
+				"BlockDeviceMappings" : [
+					{
+						"DeviceName" : "/dev/sda1",
+						"Ebs" : {
+							"DeleteOnTermination" : { "Ref": "VolumeDeleteOnInstanceTermination" },
+							"VolumeType" : { "Ref": "EbsVolumeType" },
+							"VolumeSize" : { "Ref": "RootVolumeSize" }
+						}
+					}
+				],
+				"UserData" :{ "Fn::Base64" : { "Fn::Join" : ["", [
+					"#!/bin/bash -xe\n",
+					"exec > >(tee /var/tmp/userdata.log|logger -t userdata ) 2>&1\n",
+					"#create users with root privs\n",
+					"for i in apathros ; do\n",
+					"  useradd -m -G ssh_access $i\n",
+					"  user_created=$(id -u $i > /dev/null 2>&1; echo $?)\n",
+					"   mkdir -p /home/$i/.ssh\n",
+					"   touch /home/$i/.ssh/authorized_keys\n",
+					"   chown -R $i:$i /home/$i/.ssh\n",
+					"   chmod 700 /home/$i/.ssh\n",
+					"   chmod 600 /home/$i/.ssh/authorized_keys\n",
+					"   #echo \"$i ALL=(ALL) NOPASSWD: ALL\" >> /etc/sudoers\n",
+					"   chage -I -1 -m 0 -M 99999 -E -1 $i\n",
+					"done\n",
+					"  echo \"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key\" >> /home/apathros/.ssh/authorized_keys\n",
+					"   echo -e \"\nUser_Alias ADMINS=apathros\" >> /etc/sudoers\n",
+					"   echo -e \"\nADMINS ALL=(ALL) NOPASSWD: ALL\" >> /etc/sudoers\n",
+					"\n",
+					"# Set Timezone\n",
+					"timedatectl set-timezone America/New_York\n",
+					"\n",
+					"yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional\n",
+					"yum update -y\n",
+					"yum install zip unzip bind-utils traceroute lvm2 wget -y\n",
+					"yum install nvme-cli -y\n",
+					"\n",
+					"\n",
+					"# Install SSM Agent\n",
+					"cd /tmp\n",
+					"yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm\n",
+					"systemctl enable amazon-ssm-agent\n",
+					"systemctl start amazon-ssm-agent\n",
+					"\n",
+					"#Install AWS CLI\n",
+					"cd /tmp\n",
+					"curl \"https://s3.amazonaws.com/aws-cli/awscli-bundle.zip\" -o \"awscli-bundle.zip\"\n",
+					"unzip awscli-bundle.zip\n",
+					"./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws\n",
+					"rm ./awscli-bundle.zip\n",
+					"rm -rf ./awscli-bundle\n",
+					"\n",
+					"#Install cloudwatch monitoring scripts\n",
+					"yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https perl-Digest-SHA --enablerepo=\"rhui-REGION-rhel-server-optional\" -y\n",
+					"cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.2.zip -O ; unzip CloudWatchMonitoringScripts-1.2.2.zip && rm CloudWatchMonitoringScripts-1.2.2.zip && cd aws-scripts-mon\n",
+					"\n",
+					"#Install packages for AD\n",
+					"yum install -y sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools\n",
+					"# Set Hostname\n",
+					"region=\"us-east-1\"\n",
+					"ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)\n",
+					"host_name=$(/usr/local/bin/aws ec2 --region ${region}  describe-tags --filters Name=resource-id,Values=${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)\n",
+					"hostnamectl set-hostname ${host_name}\n",
+					"reboot"
+					]
+						]
+				}
+				}
+			}
+		},
+		"AppVolume" : {
+			"Type" : "AWS::EC2::Volume",
+			"DeletionPolicy" : "Retain",
+			"Properties" : {
+				"VolumeType" : { "Ref": "EbsVolumeType" },
+				"Size" : { "Ref": "AppVolumeSize" },
+				"Encrypted": true,
+				"KmsKeyId" : { "Ref": "EbsKmsKeyId" },
+				"AvailabilityZone" : { "Fn::GetAtt" : [ "Ec2Instance", "AvailabilityZone" ] },
+				"Tags" : [ 
+          {
+            "Key": "Application",
+            "Value": { "Ref": "Application" }
+          },
+          {
+            "Key": "Name",
+						"Value": {"Fn::Join": ["", [{ "Ref": "Hostname"}, " /app" ]]}
+          }
+				]
+			}
+		},
+		"MountPoint" : {
+			"Type" : "AWS::EC2::VolumeAttachment",
+			"Properties" : {
+				"InstanceId" : { "Ref" : "Ec2Instance" },
+				"VolumeId"  : { "Ref" : "AppVolume" },
+				"Device" : "/dev/sdf"
+			}
+		},     
+		"SecurityGroup1": {
+			"Type": "AWS::EC2::SecurityGroup",
+			"Properties": {
+				"GroupName" : { "Ref": "SecurityGroup1Name" },
+				"GroupDescription" : {"Fn::Join": [" - ",  [{ "Ref": "SecurityGroup1Description" } , { "Ref": "Environment" }]]},
+				"VpcId":  { "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"VpcId" ]},
+				"Tags": [
+				{
+					"Key": "Application",
+					"Value": { "Ref": "Application"}
+				}
+				]
+			}
+		},
+		"SG1Ingress4": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "22",
+				"ToPort": "22",
+				"CidrIp": "10.160.0.0/16"
+			}
+		},
+		"SG1Ingress5": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "22",
+				"ToPort": "22",
+				"CidrIp": "10.255.0.0/16"
+			}
+		},
+		"SG1Ingress6": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "tcp",
+				"FromPort": "22",
+				"ToPort": "22",
+				"CidrIp": "172.16.0.0/12"
+			}
+		},
+		"SG1Ingress7": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "icmp",
+				"FromPort": "-1",
+				"ToPort": "-1",
+				"CidrIp": "10.160.0.0/16"
+			}
+		},
+		"SG1Ingress8": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "icmp",
+				"FromPort": "-1",
+				"ToPort": "-1",
+				"CidrIp": "172.16.0.0/12"
+			}
+		},
+		"SG1Ingress9": {
+			"Type": "AWS::EC2::SecurityGroupIngress",
+			"Properties": {
+				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
+				"IpProtocol": "icmp",
+				"FromPort": "-1",
+				"ToPort": "-1",
+				"CidrIp": "10.255.0.0/16"
+			}
+		}
+	}
+}
