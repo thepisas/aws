@@ -79,7 +79,7 @@
 		},
 		"SecurityGroup1Name": {
 			"Type": "String",
-			"Default": "RStudioDev",
+			"Default": "RSTUDIO-DEV",
 			"Description": "Security Group to be created for RStudio Instances"
 		},
 		"SecurityGroup1Description": {

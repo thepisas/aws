@@ -61,11 +61,11 @@
 	},
 	{
 		"ParameterKey": "SecurityGroup1Name",
-		"ParameterValue": "RStudioDev"
+		"ParameterValue": "RSTUDIO-DEV"
 	},
 	{
 		"ParameterKey": "SecurityGroupIdsDefault",
-		"ParameterValue": "sg-b503cac9,sg-9a579ce5,sg-0d8c756d4ed5a3730,sg-0c1f13fad848757ec"
+		"ParameterValue": "sg-b503cac9,sg-9a579ce5,sg-024fb892a45248f98"
 	},
 	{
 		"ParameterKey": "SubnetId",
