@@ -31,3 +31,8 @@ aws ecr list-images --repository-name amzecsrfdev/bucketstorageapi
 #create aws account alias
 aws iam list-account-aliases
 aws iam create-account-alias --account-alias tco-nonproduction
+
+#list rules in a security group
+aws ec2 describe-security-groups --filters Name=ip-permission.group-id,Values=*sg-024fb892a45248f98* --group-ids sg-6bc22d14
+aws ec2 describe-security-groups --filters Name=ip-permission.group-id,Values=*sg-024fb892a45248f98* --group-ids sg-6bc22d14 --output table 
+

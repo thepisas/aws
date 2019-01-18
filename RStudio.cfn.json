@@ -342,66 +342,6 @@
 				"CidrIp": "172.16.0.0/12"
 			}
 		},
-		"SG1Ingress4": {
-			"Type": "AWS::EC2::SecurityGroupIngress",
-			"Properties": {
-				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
-				"IpProtocol": "tcp",
-				"FromPort": "22",
-				"ToPort": "22",
-				"CidrIp": "10.160.0.0/16"
-			}
-		},
-		"SG1Ingress5": {
-			"Type": "AWS::EC2::SecurityGroupIngress",
-			"Properties": {
-				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
-				"IpProtocol": "tcp",
-				"FromPort": "22",
-				"ToPort": "22",
-				"CidrIp": "10.255.0.0/16"
-			}
-		},
-		"SG1Ingress6": {
-			"Type": "AWS::EC2::SecurityGroupIngress",
-			"Properties": {
-				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
-				"IpProtocol": "tcp",
-				"FromPort": "22",
-				"ToPort": "22",
-				"CidrIp": "172.16.0.0/12"
-			}
-		},
-		"SG1Ingress7": {
-			"Type": "AWS::EC2::SecurityGroupIngress",
-			"Properties": {
-				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
-				"IpProtocol": "icmp",
-				"FromPort": "-1",
-				"ToPort": "-1",
-				"CidrIp": "10.160.0.0/16"
-			}
-		},
-		"SG1Ingress8": {
-			"Type": "AWS::EC2::SecurityGroupIngress",
-			"Properties": {
-				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
-				"IpProtocol": "icmp",
-				"FromPort": "-1",
-				"ToPort": "-1",
-				"CidrIp": "172.16.0.0/12"
-			}
-		},
-		"SG1Ingress9": {
-			"Type": "AWS::EC2::SecurityGroupIngress",
-			"Properties": {
-				"GroupId": { "Fn::GetAtt": [ "SecurityGroup1", "GroupId" ]},
-				"IpProtocol": "icmp",
-				"FromPort": "-1",
-				"ToPort": "-1",
-				"CidrIp": "10.255.0.0/16"
-			}
-		},
 		 "s3peoplesoft": {
       "Type": "AWS::S3::Bucket",
       "Properties": {
