@@ -30,7 +30,7 @@ DOMPASS=""
 usage="$(basename "$0") [options] -- join host to domain
 
 where :
-        -h|-?           This help screen
+        -?           This help screen
         -v              verbose (i.e. display variables)
         -t              trial run (no changes)
         -f              force (leave domain if required)
@@ -39,11 +39,13 @@ where :
         -u arg          provide username to add host (required)
         -p arg          provide password to log in (optional)
         -e arg          provide environment. Allowed values are nonprod|prod (required)
+        -h arg          location of home directory. Eg. home|app (required)
+
 "
 
-while getopts "h?vtfd:o:u:p:e:" opt; do
+while getopts "?vtfd:o:u:p:e:h:" opt; do
     case "$opt" in
-    h|\?)
+    \?)
         echo "$usage"
         exit 0
         ;;
@@ -64,6 +66,8 @@ while getopts "h?vtfd:o:u:p:e:" opt; do
         ;;
     e)  ENV=$OPTARG
         ;;
+    h)  HOME_DIR=$OPTARG
+        ;;
     esac
 done
 
@@ -76,16 +80,16 @@ if [ $verbose -eq 1 ]; then
     echo -e "\tFQDN    = $FQDN"
     echo -e "\tforce   = $force"
     echo -e "\tENV     = $ENV"
+    echo -e "\tHOME_DIR    = $HOME_DIR"
     echo -e "----------------------------"
 fi
+
 
 #check the value input for ENV
 if [[ ("$ENV" != "nonprod" && "$ENV" != "prod") ]] ; then
   echo "Invalid value of $ENV entered for environment. Valid values are either nonprod or prod. Exiting ..."
   exit 1
 fi
-
-
 
 
 # Check if root
@@ -175,9 +179,9 @@ krb5_store_password_if_offline = True
 default_shell = /bin/bash
 ldap_id_mapping = True
 use_fully_qualified_names = False
-fallback_homedir = /home/%d/%u
+fallback_homedir = /$HOME_DIR/%d/%u
 access_provider = ad
-ad_access_filter = (|(memberOf=CN=linux_admin,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=net)(memberOf=CN=linux_rstudio_$ENV,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=com)(memberOf=CN=rstudio-user,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=com)(memberOf=CN=rstudio-superuser-admin,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=com))
+ad_access_filter = (|(memberOf=CN=linux_admin,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=net)(memberOf=CN=linux_rstudio_$ENV,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=net)(memberOf=CN=rstudio-user,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=net)(memberOf=CN=rstudio-superuser-admin,OU=Groups,OU=Corporate,DC=Amazon,DC=tiffco,DC=net))
 #ad_server = 10.192.15.11
 #ad_server_backup = 10.192.16.11
 EOF
