@@ -42,15 +42,31 @@
                 }
             }
         },
+        "IAMUser5": {
+            "Type": "AWS::IAM::User",
+            "Properties": {
+                "UserName": "testmonty",
+                "LoginProfile": {
+                    "Password": "Temp!111",
+                    "PasswordResetRequired": true
+                }
+            }
+        },
         "MontyCloudUserGroup": {
             "Type": "AWS::IAM::Group",
             "Properties": {
                 "GroupName": "MontyCloud-UserGroup",
                 "Path": "/",
                 "ManagedPolicyArns": [
-                    "arn:aws:iam::869052972610:policy/ForceMFA",
-										"arn:aws:iam::869052972610:policy/MontyCloud_AssumeProductionAccess",
-                    "arn:aws:iam::869052972610:policy/allows-assume-TCORO-in-MGMT"
+                    {
+                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:policy/ForceMFA"
+                    },
+                    {
+                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:policy/MontyCloud_AssumeProductionAccess"
+                    },
+                    {
+                        "Fn::Sub": "arn:aws:iam::${AWS::AccountId}:policy/allows-assume-TCORO-in-MGMT"
+                    }
                 ]
             }
         },
@@ -72,6 +88,9 @@
                     },
                     {
                         "Ref": "IAMUser4"
+                    },
+                    {
+                        "Ref": "IAMUser5"
                     }
                 ]
             }
@@ -105,6 +124,12 @@
         "MontyCloudUser4": {
             "Value": {
                 "Ref": "IAMUser4"
+            },
+            "Description": "IAM User Name"
+        },
+        "MontyCloudUser5": {
+            "Value": {
+                "Ref": "IAMUser5"
             },
             "Description": "IAM User Name"
         }
