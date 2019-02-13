@@ -43,9 +43,9 @@ Resources:
       GroupName: MontyCloud-UserGroup
       Path: /
       ManagedPolicyArns:
-      - arn:aws:iam::869052972610:policy/ForceMFA
-      - arn:aws:iam::869052972610:policy/MontyCloud_AssumeProductionAccess
-      - arn:aws:iam::869052972610:policy/allows-assume-TCORO-in-MGMT
+      - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/ForceMFA'
+      - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/MontyCloud_AssumeProductionAccess'
+      - !Sub 'arn:aws:iam::${AWS::AccountId}:policy/allows-assume-TCORO-in-MGMT'
   UserToGroupAddition:
     Type: AWS::IAM::UserToGroupAddition
     Properties:
