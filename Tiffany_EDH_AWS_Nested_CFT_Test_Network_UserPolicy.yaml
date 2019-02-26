@@ -1,0 +1,508 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  The primary stack which triggers the two Nested Stacks to create the VPC Infrastructure and IAM User Policies in the Tiffany Non-Prod Test environment..
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General Configuration * Indicates a required Entry
+        Parameters:
+          - KeyName
+          - ClientAccess
+          - Env
+          - AZ1
+          - AZ2
+      - Label:
+          default: VPC
+        Parameters:
+          - VPCNETWORK
+          - AutoAssignPubIP
+      - Label:
+          default: Public Subnets
+        Parameters:
+          - VPCPublicSubnet1cidr
+          - VPCPublicSubnet2cidr
+          - VPCPublicSubnet3
+          - VPCPublicSubnet3cidr
+          - VPCPublicSubnet4
+          - VPCPublicSubnet4cidr
+      - Label:
+          default: Private Subnets
+        Parameters:
+          - VPCPrivateSubnet1cidr
+          - VPCPrivateSubnet2cidr
+          - VPCPrivateSubnet3cidr
+          - VPCPrivateSubnet4cidr
+          - VPCPrivateSubnet5cidr
+          - VPCPrivateSubnet6cidr
+          - VPCPrivateSubnet7cidr
+          - VPCPrivateSubnet8cidr
+          - VPCPrivateSubnet9cidr
+          - VPCPrivateSubnet10cidr
+          - VPCPrivateSubnet11
+          - VPCPrivateSubnet11cidr
+          - VPCPrivateSubnet12
+          - VPCPrivateSubnet12cidr          
+      - Label:
+          default: VPC Peering
+        Parameters:
+          - PeeringConnections
+          - PeeringVPCID
+          - PeeringRegion 
+          - PeerOwnerId
+          - PeeringRoleArn                
+      - Label:
+          default: Unix Jump Box
+        Parameters:
+          - JumpBoxLinux
+          - JumpBoxType
+          - JumpVolumeSize
+          - JumpBoxUserData
+          - JumpBoxName
+      - Label:
+          default: IAM User Access Policy
+        Parameters:
+          - Groupname
+      - Label:
+          default: Stack URL (S3 Link)
+        Parameters:
+          - VPCTemplateURL
+          - IAMuserPolicyURL                    
+    ParameterLabels:
+      VPCTemplateURL:
+        default: '* S3 Link for Test VPC TemplateURL'
+      IAMuserPolicyURL:  
+        default: '* S3 Link for IAM User Access Policy TemplateURL'
+      Groupname:
+        default: '* IAM User Group for Access permissions'                   
+      KeyName:
+        default: 'Existing Key pair:'
+      ClientAccess:
+        default: '* Access to JumpBox Server:'
+      Env:
+        default: '* Environment Tag'
+      AZ1:
+        default: '* First AZ'
+      AZ2:
+        default: '* Second AZ'
+      VPCNETWORK:
+        default: '* VPC CIDR:'
+      AutoAssignPubIP:
+        default: 'Autoassign Public IP:'
+      VPCPublicSubnet1cidr:
+        default: '* Public Subnet 1 cidr:'
+      VPCPublicSubnet2cidr:
+        default: '* Public Subnet 2 cidr:'
+      VPCPublicSubnet3:
+        default: '* Build Public Subnet 3?:'
+      VPCPublicSubnet3cidr:
+        default: '* Public Subnet 3 cidr:'
+      VPCPublicSubnet4:
+        default: '* Build Public Subnet 4?:'
+      VPCPublicSubnet4cidr:
+        default: '* Public Subnet 3 cidr:'
+      VPCPrivateSubnet1cidr:
+        default: '* Private Subnet 1 cidr'
+      VPCPrivateSubnet2cidr:
+        default: '* Private Subnet 2 cidr:'
+      VPCPrivateSubnet3cidr:
+        default: '* Private Subnet 3 cidr:'
+      VPCPrivateSubnet4cidr:
+        default: '* Private Subnet 4 cidr:'        
+      VPCPrivateSubnet5cidr:
+        default: '* Private Subnet 5 cidr:'
+      VPCPrivateSubnet6cidr:
+        default: '* Private Subnet 6 cidr:'
+      VPCPrivateSubnet7cidr:
+        default: '* Private Subnet 7 cidr:'
+      VPCPrivateSubnet8cidr:
+        default: '* Private Subnet 8 cidr:'
+      VPCPrivateSubnet9cidr:
+        default: '* Private Subnet 9 cidr:'
+      VPCPrivateSubnet10cidr:
+        default: '* Private Subnet 10 cidr:'
+      VPCPrivateSubnet11:
+        default: '* Build Private Subnet 11?:'
+      VPCPrivateSubnet11cidr:
+        default: '* Private Subnet 11 cidr:'
+      VPCPrivateSubnet12:
+        default: '* Build Private Subnet 12?:' 
+      PeeringConnections:
+        default: '* Setup VPC Peering?'         
+      PeeringVPCID:
+        default: '* Peering Account VPC ID:'
+      PeeringRegion:
+        default: '* Peering Region:'
+      PeerOwnerId:
+        default: '* Peering Account ID:'
+      PeeringRoleArn:
+        default: '* Peering Account Role ARN:'                
+      JumpBoxLinux:
+        default: '* Launch a Unix Jump Box?'
+      JumpBoxName:
+        default: Name tag for Unix Jump Instance
+      JumpBoxType:
+        default: 'Instance Type for Unix Jump:'
+      JumpVolumeSize:
+        default: Unix Jump Root Volume Size
+      JumpBoxUserData:
+        default: 'Unix Jump Userdata:'
+Parameters:
+  JumpBoxType:
+    Description: Unix Jump Instances Type
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m4.medium
+      - m4.large
+      - m4.2xlarge
+      - m4.10xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  JumpVolumeSize:
+    Description: Size of the root volume for the NAT instances in gigs
+    Type: Number
+    Default: '20'
+  JumpBoxUserData:
+    Description: UserData to run on the nat instance (Default yum update -y)
+    Type: String
+    Default: IyEvYmluL2Jhc2gKeXVtIHVwZGF0ZSAteQo=
+  JumpBoxName:
+    Description: Name Tag of the Linux Jump Instance
+    Type: String
+    Default: Linux Jump Host
+  JumpBoxLinux:
+    Default: 'No'
+    Description: Do we need a Linux Jump Box?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'String'
+    ConstraintDescription: must be an existing EC2 KeyPair.
+  AutoAssignPubIP:
+    Description: >-
+      Should instances in the Public Subnets get assigned a DHCP Public IP by
+      Default
+    Type: String
+    Default: 'True'
+    AllowedValues:
+      - 'True'
+      - 'False'
+  AZ1:
+    Description: >-
+      First AZ to use for VPCPublicSubnet1cidr/VPCPrivateSubnet1cidr. Check EC2
+      Dashboard for AZs that are available to this account. Cloudformation
+      Limitation Prevents us from setting the public subnets to autoassign
+      public IP
+    Type: 'AWS::EC2::AvailabilityZone::Name'
+    Default: us-east-1a
+  AZ2:
+    Description: >-
+      Second AZ to use for VPCPublicSubnet2cidr/VPCPrivateSubnet2cidr. Check EC2
+      Dashboard for AZs that are available to this account. Cloudformation
+      Limitation Prevents us from setting the public subnets to autoassign
+      public IP
+    Type: 'AWS::EC2::AvailabilityZone::Name'
+    Default: us-east-1b
+  ClientAccess:
+    Description: >-
+      Client IP address range that can be used to SSH or RDP to the instances
+      (must be in cidr format).
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '64.106.131.250/32'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: REQUIRED - Must be a valid IP CIDR range of the form x.x.x.x/x
+  Env:
+    Description: 'The type of Environment? ex: QA/Stg/Prod/New,Old'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STAG
+      - NON-PROD
+    Default: TEST
+    ConstraintDescription: Should be at least 1 Character
+  PeeringConnections:
+    Default: 'No'
+    Description: Do we need a Peering Connection?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'    
+  PeeringVPCID:
+    Type: String
+    Description: 'VPC ID in the peering account'
+    Default: 'vpc-97b4f2f1'
+  PeeringRegion:
+    Type: String
+    Description: 'Peering Region'
+    AllowedValues:
+      - us-east-1
+      - us-east-2 
+      - us-west-1 
+      - us-west-2 
+      - ap-south-1  
+      - ap-northeast-3  
+      - ap-northeast-2  
+      - ap-southeast-1  
+      - ap-southeast-2  
+      - ap-northeast-1  
+      - ca-central-1  
+      - cn-north-1  
+      - cn-northwest-1 
+      - eu-central-1  
+      - eu-west-1
+      - eu-west-2 
+      - eu-west-3 
+      - eu-north-1  
+      - sa-east-1 
+    Default: us-east-1       
+  PeerOwnerId:
+    Type: String
+    Description: 'Account ID of the peering account'
+    AllowedPattern: '[0-9]+'
+    MaxLength: '12'
+    MinLength: '12'
+    Default: '907124906847'    
+  PeeringRoleArn:
+    Type: String
+    Description: 'Role Arn for the peering account'
+    Default: ''     
+  VPCNETWORK:
+    Description: VPC CIDR
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.64.0/19'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet1cidr:
+    Description: Public Subnet 1 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.64.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet2cidr:
+    Description: Public Subnet 2 CidrBlock
+    Type: String 
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.65.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet3:
+    Default: 'No'
+    Description: Do we need a 3rd Public Subnet? (Note Will be put in AZ1)
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPublicSubnet3cidr:
+    Description: Public Subnet 3 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.76.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet4:
+    Default: 'No'
+    Description: Do we need a 4th Public Subnet? (Note Will be put in AZ2)
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPublicSubnet4cidr:
+    Description: Public Subnet 4 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.77.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet1cidr:
+    Description: Private Subnet 1 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.72.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet2cidr:
+    Description: Private Subnet 2 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.73.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet3cidr:
+    Description: Private Subnet 3 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.66.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet4cidr:
+    Description: Private Subnet 4 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.67.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet5cidr:
+    Description: Private Subnet 5 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.74.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet6cidr:
+    Description: Private Subnet 6 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.75.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet7cidr:
+    Description: Private Subnet 7 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.71.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet8cidr:
+    Description: Private Subnet 8 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.70.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet9cidr:
+    Description: Private Subnet 9 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.68.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x. 
+  VPCPrivateSubnet10cidr:
+    Description: Private Subnet 10 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.69.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet11:
+    Default: 'No'
+    Description: Do we need a 11th Private Subnet?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPrivateSubnet11cidr:
+    Description: Private Subnet 11 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.78.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet12:
+    Default: 'No'
+    Description: Do we need a 12th Private Subnet?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPrivateSubnet12cidr:
+    Description: Private Subnet 12 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.79.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.      
+  Groupname:
+    Type: String
+    Description: Group Name to update the user access policy
+    Default: 'MontyCloud-UserGroup'    
+  VPCTemplateURL:
+    Type: String
+    Description: 'S3 Link for the Test VPC template URL'
+    Default: 'https://s3.amazonaws.com/cft-templates-tco/Tiffany_EDH_AWS_Test_Network_Infra_Setup_CFT.yaml'
+  IAMuserPolicyURL:
+    Type: String
+    Description: 'S3 Link for the IAM user access Policy template URL'
+    Default: 'https://s3.amazonaws.com/cft-templates-tco/Tiffany_EDH_IAM_User_Access_Policies_Template.yaml'
+Resources:
+  VPCStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref 'VPCTemplateURL'
+      Parameters:
+        JumpBoxType: !Ref 'JumpBoxType'
+        JumpVolumeSize: !Ref 'JumpVolumeSize'
+        JumpBoxUserData: !Ref 'JumpBoxUserData'
+        JumpBoxName: !Ref 'JumpBoxName'
+        JumpBoxLinux: !Ref 'JumpBoxLinux'
+        KeyName: !Ref 'KeyName'
+        AutoAssignPubIP: !Ref 'AutoAssignPubIP'
+        AZ1: !Ref 'AZ1'
+        AZ2: !Ref 'AZ2'
+        Env: !Ref 'Env'
+        PeeringConnections: !Ref 'PeeringConnections'
+        PeeringVPCID: !Ref 'PeeringVPCID'
+        PeeringRegion: !Ref 'PeeringRegion'
+        PeerOwnerId: !Ref 'PeerOwnerId'
+        PeeringRoleArn: !Ref 'PeeringRoleArn'
+        VPCNETWORK: !Ref 'VPCNETWORK'
+        VPCPublicSubnet1cidr: !Ref 'VPCPublicSubnet1cidr'
+        VPCPublicSubnet2cidr: !Ref 'VPCPublicSubnet2cidr'
+        VPCPublicSubnet3: !Ref 'VPCPublicSubnet3'
+        VPCPublicSubnet3cidr: !Ref 'VPCPublicSubnet3cidr'
+        VPCPublicSubnet4: !Ref 'VPCPublicSubnet4'
+        VPCPublicSubnet4cidr: !Ref 'VPCPublicSubnet4cidr'
+        VPCPrivateSubnet1cidr: !Ref 'VPCPrivateSubnet1cidr'
+        VPCPrivateSubnet2cidr: !Ref 'VPCPrivateSubnet2cidr'
+        VPCPrivateSubnet3cidr: !Ref 'VPCPrivateSubnet3cidr'
+        VPCPrivateSubnet4cidr: !Ref 'VPCPrivateSubnet4cidr'
+        VPCPrivateSubnet5cidr: !Ref 'VPCPrivateSubnet5cidr'
+        VPCPrivateSubnet6cidr: !Ref 'VPCPrivateSubnet6cidr'
+        VPCPrivateSubnet7cidr: !Ref 'VPCPrivateSubnet7cidr'
+        VPCPrivateSubnet8cidr: !Ref 'VPCPrivateSubnet8cidr'
+        VPCPrivateSubnet9cidr: !Ref 'VPCPrivateSubnet9cidr'
+        VPCPrivateSubnet10cidr: !Ref 'VPCPrivateSubnet10cidr'
+        VPCPrivateSubnet11: !Ref 'VPCPrivateSubnet11'
+        VPCPrivateSubnet11cidr: !Ref 'VPCPrivateSubnet11cidr'
+        VPCPrivateSubnet12: !Ref 'VPCPrivateSubnet12'
+        VPCPrivateSubnet12cidr: !Ref 'VPCPrivateSubnet12cidr'
+  IAMUserPolicyStack:
+    DependsOn: VPCStack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Ref 'IAMuserPolicyURL'
+      Parameters:
+        GroupName: !Ref 'Groupname'
+        TestVpcID: !GetAtt 'VPCStack.Outputs.VPCID'

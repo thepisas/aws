@@ -22,7 +22,7 @@ fi
 Application=${4}
 operation=${5}
 if [ ${operation} = 'create' ]; then
-	cmd="aws cloudformation create-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM --timeout-in-minutes 8 --tags Key=Application,Value=${Application} --enable-termination-protection"
+	cmd="aws cloudformation create-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM --timeout-in-minutes 15 --tags Key=Application,Value=${Application} --enable-termination-protection"
 elif [ ${operation} = 'update' ]; then
 	cmd="aws cloudformation update-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM"
 else 

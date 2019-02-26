@@ -1,0 +1,641 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS Cloudformation template to creates IAM policy with required permissions to a particular VPC in the Tiffany Non-Prod Environment.
+Parameters:
+  GroupName:
+    Type: String
+    Description: IAM Group Name to update the user access policy
+    Default: 'MontyCloud-UserGroup'
+  TestVpcID:
+    Type: String
+    Description: Select the VPC ID to allow Access Permissions.
+Resources:
+  MontyCloudUserPolicy: 
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: "IAM Tag/VPC based restricted Policy for providing access to deploy resources in Non-Prod Environment"
+      Path: "/"
+      Groups:
+        - !Ref GroupName      
+      ManagedPolicyName: MontyCloud-UserAcces-Policy
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Sid: NonResourceBasedReadOnlyPermissions
+            Action:
+              - 'ec2:Describe*'
+              - 'ec2:CreateKeyPair'
+              - 'ec2:CreateSecurityGroup'
+              - 'ec2:Get*'
+              - 'ec2:DeleteTags'
+              - 'ec2:Create*'
+              - 'iam:GetInstanceProfiles'
+              - 'iam:ListInstanceProfiles'
+              - 'ec2:AcceptVpcPeeringConnection'
+              - 'ec2:DeleteVpcPeeringConnection'
+              - 'ec2:CreateVpcPeeringConnection'
+              - 'ec2:RejectVpcPeeringConnection'
+              - 'ec2:ModifyVpcEndpointServicePermissions'
+              - 'ec2:ModifyVpcEndpointServiceConfiguration'
+              - 'ec2:MoveAddressToVpc'
+              - 'ec2:CreateVpc'
+              - 'ec2:DisassociateVpcCidrBlock'
+              - 'ec2:ModifyVpcPeeringConnectionOptions'
+              - 'ec2:ModifyVpcAttribute'
+              - 'ec2:RejectTransitGatewayVpcAttachment'
+              - 'ec2:RejectVpcEndpointConnections'
+              - 'ec2:EnableVpcClassicLink'
+              - 'ec2:Attach*'
+              - 'ec2:Associate*'
+              - 'ec2:Accept*'
+              - 'ec2:Assign*'
+              - 'ec2:Allocate*'
+              - 'ec2:CreateVpcEndpointConnectionNotification'
+              - 'ec2:CreateVpcEndpointServiceConfiguration'
+              - 'ec2:CreateTransitGatewayVpcAttachment'
+              - 'ec2:DeleteVpcEndpointConnectionNotifications'
+              - 'ec2:CreateDefaultVpc'
+              - 'ec2:CreateVpcEndpoint'
+              - 'ec2:DisableVpcClassicLinkDnsSupport'
+              - 'ec2:DisableVpcClassicLink'
+              - 'ec2:ModifyVpcTenancy'
+              - 'ec2:EnableVpcClassicLinkDnsSupport'
+              - 'ec2:Modify*'
+              - 'ec2:Enable*'                            
+            Effect: Allow
+            Resource: '*'
+          - Sid: AllowInstanceActions
+            Effect: Allow
+            Action:
+              - 'ec2:RebootInstances'
+              - 'ec2:StopInstances'
+              - 'ec2:TerminateInstances'
+              - 'ec2:StartInstances'
+              - 'ec2:AttachVolume'
+              - 'ec2:DetachVolume'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:ec2:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':instance/*'
+            Condition:
+              StringEquals:
+                'ec2:ResourceTag/Vendor': 'MontyCloud'               
+          - Sid: EC2RunInstances
+            Effect: Allow
+            Action: 'ec2:RunInstances'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:ec2:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':instance/*'  
+            Condition:
+              StringEquals:
+                'aws:RequestTag/Vendor': 'MontyCloud' 
+          - Sid: EC2DeleteDetach
+            Effect: Allow
+            Action: 
+              - 'ec2:Delete*'
+              - 'ec2:Detach*'
+              - 'ec2:Disassociate*'
+              - 'ec2:Disable*'
+            Resource: '*' 
+            Condition:
+              StringEquals:
+                'aws:RequestTag/Vendor': 'MontyCloud'                                            
+          - Sid: EC2RunInstancesSubnet
+            Effect: Allow
+            Action: 'ec2:RunInstances'
+            Resource: !Join 
+              - ''
+              - - 'arn:aws:ec2:'
+                - !Ref 'AWS::Region'
+                - ':'
+                - !Ref 'AWS::AccountId'
+                - ':subnet/*'
+            Condition:
+              StringEquals:
+                'ec2:vpc': !Join 
+                  - ''
+                  - - 'arn:aws:ec2:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - ':vpc/'
+                    - !Ref TestVpcID
+                    - ''
+          - Sid: RemainingRunInstancePermissions
+            Effect: Allow
+            Action: 'ec2:RunInstances'
+            Resource:
+              - !Join 
+                - ''
+                - - 'arn:aws:ec2:'
+                  - !Ref 'AWS::Region'
+                  - ':'
+                  - !Ref 'AWS::AccountId'
+                  - ':volume/*'
+              - !Join 
+                - ''
+                - - 'arn:aws:ec2:'
+                  - !Ref 'AWS::Region'
+                  - '::image/*'
+              - !Join 
+                - ''
+                - - 'arn:aws:ec2:'
+                  - !Ref 'AWS::Region'
+                  - '::snapshot/*'
+              - !Join 
+                - ''
+                - - 'arn:aws:ec2:'
+                  - !Ref 'AWS::Region'
+                  - ':'
+                  - !Ref 'AWS::AccountId'
+                  - ':network-interface/*'
+              - !Join 
+                - ''
+                - - 'arn:aws:ec2:'
+                  - !Ref 'AWS::Region'
+                  - ':'
+                  - !Ref 'AWS::AccountId'
+                  - ':key-pair/*'
+              - !Join 
+                - ''
+                - - 'arn:aws:ec2:'
+                  - !Ref 'AWS::Region'
+                  - ':'
+                  - !Ref 'AWS::AccountId'
+                  - ':security-group/*'
+          - Sid: EC2VpcNonresourceSpecificActions
+            Effect: Allow
+            Action:
+              - 'ec2:DeleteNetworkAcl'
+              - 'ec2:DeleteNetworkAclEntry'
+              - 'ec2:DeleteRoute'
+              - 'ec2:DeleteRouteTable'
+              - 'ec2:AuthorizeSecurityGroupEgress'
+              - 'ec2:AuthorizeSecurityGroupIngress'
+              - 'ec2:RevokeSecurityGroupEgress'
+              - 'ec2:RevokeSecurityGroupIngress'
+              - 'ec2:DeleteSecurityGroup'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'ec2:vpc': !Join 
+                  - ''
+                  - - 'arn:aws:ec2:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - ':vpc/'
+                    - !Ref TestVpcID
+                    - ''
+          - Sid: AllowGlobalAutoscalingActions
+            Effect: Allow
+            Action:
+              - 'autoscaling:Describe*' 
+              - 'autoscaling:DeletePolicy'
+              - 'autoscaling:ExecutePolicy'
+              - 'autoscaling:PutScalingPolicy'
+              - 'autoscaling:DeleteTags'
+              - 'autoscaling:CreateOrUpdateTags'
+              - 'autoscaling:CreateLaunchConfiguration'
+            Resource: '*'  
+          - Sid: AllowCreateAutoscalingActions
+            Effect: Allow
+            Action:
+              - 'autoscaling:ExitStandby'
+              - 'autoscaling:BatchPutScheduledUpdateGroupAction'
+              - 'autoscaling:EnterStandby'
+              - 'autoscaling:PutScheduledUpdateGroupAction'
+              - 'autoscaling:UpdateAutoScalingGroup'
+              - 'autoscaling:DeleteNotificationConfiguration'
+              - 'autoscaling:SetInstanceHealth'
+              - 'autoscaling:TerminateInstanceInAutoScalingGroup'
+              - 'autoscaling:PutNotificationConfiguration'
+              - 'autoscaling:AttachLoadBalancers'
+              - 'autoscaling:DetachLoadBalancers'
+              - 'autoscaling:BatchDeleteScheduledAction'
+              - 'autoscaling:EnableMetricsCollection'
+              - 'autoscaling:ResumeProcesses'
+              - 'autoscaling:SetDesiredCapacity'
+              - 'autoscaling:PutLifecycleHook'
+              - 'autoscaling:DetachLoadBalancerTargetGroups'
+              - 'autoscaling:SuspendProcesses'
+              - 'autoscaling:AttachLoadBalancerTargetGroups'
+              - 'autoscaling:AttachInstances'
+              - 'autoscaling:CompleteLifecycleAction'
+              - 'autoscaling:DisableMetricsCollection'
+              - 'autoscaling:DeleteLaunchConfiguration'
+              - 'autoscaling:SetInstanceProtection'
+              - 'autoscaling:DeleteAutoScalingGroup'
+              - 'autoscaling:DeleteLifecycleHook'
+              - 'autoscaling:CreateAutoScalingGroup'
+              - 'autoscaling:DetachInstances'
+              - 'autoscaling:DeleteScheduledAction'
+              - 'autoscaling:RecordLifecycleActionHeartbeat'
+            Resource: '*'  
+            Condition:
+              StringEquals:
+                'autoscaling:ResourceTag/Vendor': 'MontyCloud'
+          - Sid: AllowGlobalELBActions
+            Effect: Allow
+            Action:
+              - 'elasticloadbalancing:Describe*'
+              - 'elasticloadbalancing:RemoveTags'
+              - 'elasticloadbalancing:AddTags'
+            Resource: '*'
+          - Sid: AllowDeleteELBActions
+            Effect: Allow
+            Action:
+              - 'elasticloadbalancing:SetLoadBalancerPoliciesForBackendServer'
+              - 'elasticloadbalancing:DetachLoadBalancerFromSubnets'
+              - 'elasticloadbalancing:AttachLoadBalancerToSubnets'
+              - 'elasticloadbalancing:ConfigureHealthCheck'
+              - 'elasticloadbalancing:SetLoadBalancerListenerSSLCertificate'
+              - 'elasticloadbalancing:DeleteLoadBalancer'
+              - 'elasticloadbalancing:DeleteLoadBalancerPolicy'
+              - 'elasticloadbalancing:SetLoadBalancerPoliciesOfListener'
+              - 'elasticloadbalancing:EnableAvailabilityZonesForLoadBalancer'
+              - 'elasticloadbalancing:ApplySecurityGroupsToLoadBalancer'
+              - 'elasticloadbalancing:DeleteLoadBalancerListeners'
+              - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer'
+              - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+              - 'elasticloadbalancing:ModifyLoadBalancerAttributes'
+              - 'elasticloadbalancing:DisableAvailabilityZonesForLoadBalancer'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'elasticloadbalancing:ResourceTag/Vendor': 'MontyCloud'
+          - Sid: AllowCreateELBActions
+            Effect: Allow
+            Action:
+              - 'elasticloadbalancing:CreateLoadBalancer'
+              - 'elasticloadbalancing:CreateLBCookieStickinessPolicy'
+              - 'elasticloadbalancing:CreateLoadBalancerListeners'
+              - 'elasticloadbalancing:CreateAppCookieStickinessPolicy'
+              - 'elasticloadbalancing:CreateLoadBalancerPolicy'
+            Resource: '*'
+            Condition:
+              StringEquals:
+                'aws:RequestTag/Vendor': 'MontyCloud'                
+  MontyCloudRDSAccessPolicy: 
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: "IAM Tag/VPC based restricted Policy for providing access to deploy resources in Non-Prod Environment"
+      Path: "/"
+      Groups:
+        - !Ref GroupName      
+      ManagedPolicyName: MontyCloud-RDS-RedshiftAcces-Policy
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Sid: AllowRedshiftGobalActions
+            Effect: Allow
+            Action:
+              - 'redshift:Describe*'
+              - 'redshift:ViewQueriesInConsole'
+              - 'redshift:PurchaseReservedNodeOffering'
+              - 'redshift:ModifyClusterIamRoles'
+              - 'redshift:ResetClusterParameterGroup'
+              - 'redshift:ModifySnapshotCopyRetentionPeriod'
+              - 'redshift:RestoreTableFromClusterSnapshot'
+              - 'redshift:DisableSnapshotCopy'
+              - 'redshift:ModifyEventSubscription'
+              - 'redshift:ModifyClusterSubnetGroup'
+              - 'redshift:DisableLogging'
+              - 'redshift:AuthorizeSnapshotAccess'
+              - 'redshift:RevokeSnapshotAccess'
+              - 'redshift:RevokeClusterSecurityGroupIngress'
+              - 'redshift:RebootCluster'
+              - 'redshift:RestoreFromClusterSnapshot'
+              - 'redshift:EnableLogging'
+              - 'redshift:CopyClusterSnapshot'
+              - 'redshift:EnableSnapshotCopy'
+              - 'redshift:CancelQuerySession'
+              - 'redshift:ModifyClusterParameterGroup'
+              - 'redshift:GetClusterCredentials'
+              - 'redshift:JoinGroup'
+              - 'redshift:ModifyCluster'
+              - 'redshift:AuthorizeClusterSecurityGroupIngress'                            
+            Resource: '*'  
+          - Sid: AllowRedshiftCreateActions
+            Effect: Allow
+            Action:
+              - 'redshift:Create*'
+            Resource: '*'               
+            Condition:
+              StringEquals:
+                'redshift:RequestTag/Vendor': 'MontyCloud'                                
+          - Sid: AllowRedshiftDeleteActions
+            Effect: Allow
+            Action:
+              - 'redshift:Create*' 
+            Resource: '*'              
+            Condition:
+              StringEquals:
+                'redshift:ResourceTag/Vendor': 'MontyCloud'                                                                                            
+          - Sid: AllowRDSGobalActions
+            Effect: Allow
+            Action:
+              - 'rds:Describe*'
+              - 'rds:DownloadCompleteDBLogFile'
+              - 'rds:PurchaseReservedNodeOffering'
+              - 'rds:AuthorizeDBSecurityGroupIngress'
+              - 'rds:StartDBCluster'
+              - 'rds:ResetDBParameterGroup'
+              - 'rds:CreateOptionGroup'
+              - 'rds:CreateDBSubnetGroup'
+              - 'rds:PurchaseReservedDBInstancesOffering'
+              - 'rds:ModifyDBParameterGroup'
+              - 'rds:AddSourceIdentifierToSubscription'
+              - 'rds:CopyDBParameterGroup'
+              - 'rds:AddRoleToDBCluster'
+              - 'rds:ModifyDBClusterParameterGroup'
+              - 'rds:StopDBCluster'
+              - 'rds:CreateDBParameterGroup'
+              - 'rds:PromoteReadReplica'
+              - 'rds:DeleteDBSubnetGroup'
+              - 'rds:CreateDBSnapshot'
+              - 'rds:DeleteDBSecurityGroup'
+              - 'rds:CreateDBClusterSnapshot'
+              - 'rds:DeleteDBParameterGroup'
+              - 'rds:CreateDBClusterParameterGroup'
+              - 'rds:ModifyDBSnapshotAttribute'
+              - 'rds:RemoveTagsFromResource'
+              - 'rds:CreateEventSubscription'
+              - 'rds:ModifyOptionGroup'
+              - 'rds:RestoreDBClusterFromSnapshot'
+              - 'rds:DeleteOptionGroup'
+              - 'rds:FailoverDBCluster'
+              - 'rds:DeleteEventSubscription'
+              - 'rds:RemoveSourceIdentifierFromSubscription'
+              - 'rds:RevokeDBSecurityGroupIngress'
+              - 'rds:ModifyCurrentDBClusterCapacity'
+              - 'rds:ResetDBClusterParameterGroup'
+              - 'rds:RestoreDBClusterToPointInTime'
+              - 'rds:AddTagsToResource'
+              - 'rds:CopyDBSnapshot'
+              - 'rds:CopyDBClusterSnapshot'
+              - 'rds:ModifyEventSubscription'
+              - 'rds:CopyOptionGroup'
+              - 'rds:CreateDBCluster'
+              - 'rds:CreateDBSecurityGroup'
+              - 'rds:RebootDBInstance'
+              - 'rds:DeleteDBClusterParameterGroup'
+              - 'rds:ApplyPendingMaintenanceAction'
+              - 'rds:CreateDBInstanceReadReplica'
+              - 'rds:ModifyDBSubnetGroup'                                         
+            Resource: '*'              
+          - Sid: AllowRDSCreateActions
+            Effect: Allow
+            Action:
+              - 'rds:StopDBInstance' 
+              - 'rds:StartDBInstance'
+              - 'rds:RestoreDBInstanceToPointInTime'
+              - 'rds:RestoreDBInstanceFromDBSnapshot'
+              - 'rds:ModifyDBInstance'
+              - 'rds:CreateDBInstance'
+            Resource: '*'  
+            Condition:
+              StringEquals:
+                'rds:Vpc': !Join 
+                  - ''
+                  - - 'arn:aws:ec2:'
+                    - !Ref 'AWS::Region'
+                    - ':'
+                    - !Ref 'AWS::AccountId'
+                    - ':vpc/'
+                    - !Ref TestVpcID
+                    - ''                           
+          - Sid: AllowRDSDeleteInstanceActions
+            Effect: Allow
+            Action:
+              - 'rds:DeleteDBInstance' 
+            Resource: '*'              
+            Condition:
+              StringEquals:
+                'rds:db-tag/Vendor': 'MontyCloud'
+          - Sid: AllowRDSDeleteClusterActions
+            Effect: Allow
+            Action:
+              - 'rds:DeleteDBCluster' 
+              - 'rds:ModifyDBCluster'
+            Resource: '*'              
+            Condition:
+              StringEquals:
+                'rds:cluster-tag/Vendor': 'MontyCloud'                
+          - Sid: AllowRDSDeleteClusterSnapActions
+            Effect: Allow
+            Action:
+              - 'rds:DeleteDBClusterSnapshot' 
+              - 'rds:RestoreDBClusterFromSnapshot'
+              - 'rds:ModifyDBClusterSnapshotAttribute'
+            Resource: '*'              
+            Condition:
+              StringEquals:
+                'rds:cluster-snapshot-tag/Vendor': 'MontyCloud' 
+          - Sid: AllowRDSDeleteSnapActions
+            Effect: Allow
+            Action:
+              - 'rds:DeleteDBSnapshot' 
+            Resource: '*'              
+            Condition:
+              StringEquals:
+                'rds:snapshot-tag/Vendor': 'MontyCloud'
+  MontyCloudGlobalPolicy: 
+    Type: AWS::IAM::ManagedPolicy
+    Properties: 
+      Description: "Global Policy for providing access to deploy resources in Non-Prod Environment"
+      Path: "/"
+      Groups:
+        - !Ref GroupName      
+      ManagedPolicyName: MontyCloud-User-GlobalPolicy
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          - Sid: "GlobalIAMBasedPermissions"
+            Effect: "Allow"
+            Action:
+              - 'iam:CreateInstanceProfile'
+              - 'iam:UpdateAssumeRolePolicy'
+              - 'iam:ListRoleTags'
+              - 'iam:PutRolePermissionsBoundary'
+              - 'iam:TagRole'
+              - 'iam:RemoveRoleFromInstanceProfile'
+              - 'iam:CreateRole'
+              - 'iam:Attach*'
+              - 'iam:PutRolePolicy'
+              - 'iam:DeleteRolePermissionsBoundary'
+              - 'iam:PassRole'
+              - 'iam:DeleteRole'
+              - 'iam:DeletePolicy'
+              - 'iam:Detach*'
+              - 'iam:DeleteRolePolicy'
+              - 'iam:UploadSSHPublicKey'
+              - 'iam:ListRolePolicies'
+              - 'iam:CreatePolicyVersion'
+              - 'iam:ListAccessKeys'
+              - 'iam:ListPolicies'
+              - 'iam:List*'
+              - 'iam:Get*'
+              - 'iam:DeleteInstanceProfile'
+              - 'iam:GetRole'
+              - 'iam:DeleteAccountPasswordPolicy'
+              - 'iam:GetInstanceProfile'
+              - 'iam:PutUserPermissionsBoundary'
+              - 'iam:Delete*'
+              - 'iam:DeleteUserPermissionsBoundary'
+              - 'iam:ListInstanceProfiles'
+              - 'iam:Put*'
+              - 'iam:Update*'
+              - 'iam:GetRolePolicy'
+              - 'iam:SetDefaultPolicyVersion'
+              - 'iam:UntagRole'
+              - 'iam:UpdateRoleDescription'
+              - 'iam:UpdateAccessKey'
+              - 'iam:UpdateSSHPublicKey'
+              - 'iam:CreatePolicy'
+              - 'iam:AddClientIDToOpenIDConnectProvider'
+              - 'iam:AddRoleToInstanceProfile'              
+            Resource: '*'
+          - Sid: "DenyUserAccessPermissions"
+            Effect: "Deny"
+            Action:
+              - 'iam:ListUsers'
+              - 'iam:ListGroups'
+            Resource: '*'              
+          - Sid: "GlobalResourceBasedPermissions"
+            Effect: "Allow"
+            Action:
+              - 'logs:*'
+              - 'ecs:*'
+              - 'events:*'
+              - 'lambda:*'
+              - 'sts:*'              
+              - 'elasticmapreduce:*'
+              - 'cloudformation:*'
+              - 'cloudwatch:*'
+            Resource: '*'            
+          - Sid: AllowS3GobalActions
+            Effect: Allow
+            Action:
+              - 's3:List*'
+              - 's3:Get*'
+              - 's3:CreateBucket'
+              - 's3:PutBucketTagging'              
+            Resource: '*'                                       
+          - Sid: AllowS3ActionsforParticularTags
+            Effect: Allow
+            Action:
+              - 's3:PutAnalyticsConfiguration'
+              - 's3:PutAccelerateConfiguration'
+              - 's3:DeleteObjectVersion'
+              - 's3:ReplicateTags'
+              - 's3:RestoreObject'
+              - 's3:CreateBucket'
+              - 's3:ReplicateObject'
+              - 's3:PutEncryptionConfiguration'
+              - 's3:DeleteBucketWebsite'
+              - 's3:AbortMultipartUpload'
+              - 's3:PutBucketTagging'
+              - 's3:PutLifecycleConfiguration'
+              - 's3:PutBucketAcl'
+              - 's3:PutObjectTagging'
+              - 's3:DeleteObject'
+              - 's3:DeleteBucket'
+              - 's3:PutBucketVersioning'
+              - 's3:PutObjectAcl'
+              - 's3:DeleteObjectTagging'
+              - 's3:PutBucketPublicAccessBlock'
+              - 's3:PutAccountPublicAccessBlock'
+              - 's3:PutMetricsConfiguration'
+              - 's3:PutReplicationConfiguration'
+              - 's3:PutObjectVersionTagging'
+              - 's3:DeleteObjectVersionTagging'
+              - 's3:PutBucketCORS'
+              - 's3:DeleteBucketPolicy'
+              - 's3:PutInventoryConfiguration'
+              - 's3:PutObject'
+              - 's3:PutBucketNotification'
+              - 's3:ObjectOwnerOverrideToBucketOwner'
+              - 's3:PutBucketWebsite'
+              - 's3:PutBucketRequestPayment'
+              - 's3:PutBucketLogging'
+              - 's3:PutObjectVersionAcl'
+              - 's3:PutBucketPolicy'
+              - 's3:ReplicateDelete'
+            Resource: '*' 
+          - Sid: AllowGlobalSSMActions
+            Effect: Allow
+            Action:
+              - 'ssm:Describe*' 
+              - 'ssm:List*'
+              - 'ssm:Get*'
+              - 'ssm:GetManifest'
+              - 'ssm:PutConfigurePackageResult'
+            Resource: '*'  
+          - Sid: AllowCreateSSMActions
+            Effect: Allow
+            Action:
+              - 'ssm:SendCommand'
+              - 'ssm:CancelCommand'
+              - 'ssm:DeregisterTargetFromMaintenanceWindow'
+              - 'ssm:ResumeSession'
+              - 'ssm:UpdateDocumentDefaultVersion'
+              - 'ssm:SendAutomationSignal'
+              - 'ssm:CreateActivation'
+              - 'ssm:UpdateAssociation'
+              - 'ssm:UpdateMaintenanceWindowTarget'
+              - 'ssm:UpdateAssociationStatus'
+              - 'ssm:StartSession'
+              - 'ssm:DeleteActivation'
+              - 'ssm:RegisterPatchBaselineForPatchGroup'
+              - 'ssm:DeleteParameter'
+              - 'ssm:StartAssociationsOnce'
+              - 'ssm:UpdateInstanceInformation'
+              - 'ssm:RemoveTagsFromResource'
+              - 'ssm:AddTagsToResource'
+              - 'ssm:UpdateDocument'
+              - 'ssm:PutComplianceItems'
+              - 'ssm:UpdateManagedInstanceRole'
+              - 'ssm:UpdatePatchBaseline'
+              - 'ssm:RegisterTaskWithMaintenanceWindow'
+              - 'ssm:RegisterTargetWithMaintenanceWindow'
+              - 'ssm:CreateDocument'
+              - 'ssm:DeleteParameters'
+              - 'ssm:PutParameter'
+              - 'ssm:UpdateMaintenanceWindow'
+              - 'ssm:StartAutomationExecution'
+              - 'ssm:CreateAssociation'
+              - 'ssm:TerminateSession'
+              - 'ssm:UpdateMaintenanceWindowTask'
+              - 'ssm:DeletePatchBaseline'
+              - 'ssm:CreatePatchBaseline'
+              - 'ssm:DeleteResourceDataSync'
+              - 'ssm:CreateResourceDataSync'
+              - 'ssm:CreateMaintenanceWindow'
+              - 'ssm:DeregisterTaskFromMaintenanceWindow'
+              - 'ssm:DeleteMaintenanceWindow'
+              - 'ssm:DeregisterPatchBaselineForPatchGroup'
+              - 'ssm:StopAutomationExecution'
+              - 'ssm:DeleteAssociation'
+              - 'ssm:DeregisterManagedInstance'
+              - 'ssm:PutInventory'
+              - 'ssm:CreateAssociationBatch'
+              - 'ssm:ModifyDocumentPermission'
+              - 'ssm:RegisterDefaultPatchBaseline'
+              - 'ssm:DeleteDocument'
+              - 'ssm:UpdateInstanceAssociationStatus'
+            Resource: '*'                       
+Outputs:
+  MontyCloudUserPolicy: 
+      Value: !Ref MontyCloudUserPolicy                
+  MontyCloudRDSRedshiftAccessPolicy: 
+      Value: !Ref MontyCloudRDSAccessPolicy
+  MontyCloudGlobalPolicy: 
+      Value: !Ref MontyCloudGlobalPolicy      

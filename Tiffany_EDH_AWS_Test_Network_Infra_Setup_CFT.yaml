@@ -1,0 +1,1514 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  This template creates the VPC infrastructure for a multi-AZ, multi-tier deployment. It creates a VPC with 12 Subnets - 2 Public subnets, 10 Private subnets, with an option to create 2 more public and private subnets each. The template also creates route tables i.e. 1 Public Route
+  table and 4 Private Route tables, a Single NAT Gateway that is attached to the private route table, an optional Jumpbox Server, a VPC Endpoint for S3 Private Links and a Peering Connection with Management VPCID.
+Parameters:
+  JumpBoxType:
+    Description: Unix Jump Instances Type
+    Type: String
+    Default: t2.medium
+    AllowedValues:
+      - t2.micro
+      - t2.small
+      - t2.medium
+      - t2.large
+      - m3.medium
+      - m3.large
+      - m3.xlarge
+      - m4.medium
+      - m4.large
+      - m4.2xlarge
+      - m4.10xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  JumpVolumeSize:
+    Description: Size of the root volume for the NAT instances in gigs
+    Type: Number
+    Default: '20'
+  JumpBoxUserData:
+    Description: UserData to run on the nat instance (Default yum update -y)
+    Type: String
+    Default: IyEvYmluL2Jhc2gKeXVtIHVwZGF0ZSAteQo=
+  JumpBoxName:
+    Description: Name Tag of the Linux Jump Instance
+    Type: String
+    Default: Linux Jump Host
+  JumpBoxLinux:
+    Default: 'No'
+    Description: Do we need a Linux Jump Box?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'     
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    ConstraintDescription: must be an existing EC2 KeyPair.
+  AutoAssignPubIP:
+    Description: >-
+      Should instances in the Public Subnets get assigned a DHCP Public IP by
+      Default
+    Type: String
+    Default: 'True'
+    AllowedValues:
+      - 'True'
+      - 'False'
+  AZ1:
+    Description: >-
+      First AZ to use for VPCPublicSubnet1cidr/VPCPrivateSubnet1cidr. Check EC2
+      Dashboard for AZs that are available to this account. Cloudformation
+      Limitation Prevents us from setting the public subnets to autoassign
+      public IP
+    Type: 'AWS::EC2::AvailabilityZone::Name'
+    Default: us-east-1a
+  AZ2:
+    Description: >-
+      Second AZ to use for VPCPublicSubnet2cidr/VPCPrivateSubnet2cidr. Check EC2
+      Dashboard for AZs that are available to this account. Cloudformation
+      Limitation Prevents us from setting the public subnets to autoassign
+      public IP
+    Type: 'AWS::EC2::AvailabilityZone::Name'
+    Default: us-east-1b
+  ClientAccess:
+    Description: >-
+      Client IP address range that can be used to SSH or RDP to the instances
+      (must be in cidr format).
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '64.106.131.250/32'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: REQUIRED - Must be a valid IP CIDR range of the form x.x.x.x/x
+  Env:
+    Description: 'The type of environment? ex: QA/Stg/Prod/New,Old'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - NON-PROD
+    Default: TEST
+    ConstraintDescription: Should be at least 1 Character
+  PeeringConnections:
+    Default: 'No'
+    Description: Do we need a Peering Connection?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'    
+  PeeringVPCID:
+    Type: String
+    Description: 'VPC ID in the peering account'
+    Default: 'vpc-97b4f2f1'
+  PeeringRegion:
+    Type: String
+    Description: 'Peering Region'
+    AllowedValues:
+      - us-east-1
+      - us-east-2 
+      - us-west-1 
+      - us-west-2 
+      - ap-south-1  
+      - ap-northeast-3  
+      - ap-northeast-2  
+      - ap-southeast-1  
+      - ap-southeast-2  
+      - ap-northeast-1  
+      - ca-central-1  
+      - cn-north-1  
+      - cn-northwest-1 
+      - eu-central-1  
+      - eu-west-1
+      - eu-west-2 
+      - eu-west-3 
+      - eu-north-1  
+      - sa-east-1 
+    Default: us-east-1       
+  PeerOwnerId:
+    Type: String
+    Description: 'Account ID of the peering account'
+    AllowedPattern: '[0-9]+'
+    MaxLength: '12'
+    MinLength: '12'
+    Default: '907124906847'    
+  PeeringRoleArn:
+    Type: String
+    Description: 'Role Arn for the peering account'
+    Default: ''     
+  VPCNETWORK:
+    Description: VPC CIDR
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.64.0/19'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet1cidr:
+    Description: Public Subnet 1 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.64.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet2cidr:
+    Description: Public Subnet 2 CidrBlock
+    Type: String 
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.65.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet3:
+    Default: 'No'
+    Description: Do we need a 3rd Public Subnet? (Note Will be put in AZ1)
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPublicSubnet3cidr:
+    Description: Public Subnet 3 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.76.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPublicSubnet4:
+    Default: 'No'
+    Description: Do we need a 4th Public Subnet? (Note Will be put in AZ2)
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPublicSubnet4cidr:
+    Description: Public Subnet 4 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.77.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet1cidr:
+    Description: Private Subnet 1 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.72.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet2cidr:
+    Description: Private Subnet 2 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.73.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet3cidr:
+    Description: Private Subnet 3 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.66.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet4cidr:
+    Description: Private Subnet 4 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.67.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet5cidr:
+    Description: Private Subnet 5 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.74.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet6cidr:
+    Description: Private Subnet 6 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.75.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet7cidr:
+    Description: Private Subnet 7 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.71.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet8cidr:
+    Description: Private Subnet 8 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.70.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet9cidr:
+    Description: Private Subnet 9 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.68.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x. 
+  VPCPrivateSubnet10cidr:
+    Description: Private Subnet 10 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.69.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet11:
+    Default: 'No'
+    Description: Do we need a 11th Private Subnet?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPrivateSubnet11cidr:
+    Description: Private Subnet 11 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.78.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.
+  VPCPrivateSubnet12:
+    Default: 'No'
+    Description: Do we need a 12th Private Subnet?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  VPCPrivateSubnet12cidr:
+    Description: Private Subnet 12 CidrBlock
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: 10.193.79.0/24
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.      
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Configuration * Indicates a required Entry
+        Parameters:
+          - KeyName
+          - Env
+          - AZ1
+          - AZ2
+      - Label:
+          default: VPC
+        Parameters:
+          - VPCNETWORK
+          - AutoAssignPubIP
+      - Label:
+          default: Public Subnets
+        Parameters:
+          - VPCPublicSubnet1cidr
+          - VPCPublicSubnet2cidr
+          - VPCPublicSubnet3
+          - VPCPublicSubnet3cidr
+          - VPCPublicSubnet4
+          - VPCPublicSubnet4cidr
+      - Label:
+          default: Private Subnets
+        Parameters:
+          - VPCPrivateSubnet1cidr
+          - VPCPrivateSubnet2cidr
+          - VPCPrivateSubnet3cidr
+          - VPCPrivateSubnet4cidr
+          - VPCPrivateSubnet5cidr
+          - VPCPrivateSubnet6cidr
+          - VPCPrivateSubnet7cidr
+          - VPCPrivateSubnet8cidr
+          - VPCPrivateSubnet9cidr
+          - VPCPrivateSubnet10cidr
+          - VPCPrivateSubnet11
+          - VPCPrivateSubnet11cidr
+          - VPCPrivateSubnet12
+          - VPCPrivateSubnet12cidr          
+      - Label:
+          default: VPC Peering
+        Parameters:
+          - PeeringConnections
+          - PeeringVPCID
+          - PeeringRegion 
+          - PeerOwnerId
+          - PeeringRoleArn                
+      - Label:
+          default: Unix Jump Box
+        Parameters:
+          - JumpBoxLinux
+          - JumpBoxType
+          - JumpVolumeSize
+          - JumpBoxUserData
+          - JumpBoxName
+          - ClientAccess
+    ParameterLabels:                     
+      KeyName:
+        default: 'Existing Key pair:'
+      ClientAccess:
+        default: '* Access to JumpBox Server:'
+      Env:
+        default: '* Environment Tag'
+      AZ1:
+        default: '* First AZ'
+      AZ2:
+        default: '* Second AZ'
+      VPCNETWORK:
+        default: '* VPC CIDR:'
+      AutoAssignPubIP:
+        default: 'Autoassign Public IP:'
+      VPCPublicSubnet1cidr:
+        default: '* Public Subnet 1 cidr:'
+      VPCPublicSubnet2cidr:
+        default: '* Public Subnet 2 cidr:'
+      VPCPublicSubnet3:
+        default: '* Build Public Subnet 3?:'
+      VPCPublicSubnet3cidr:
+        default: '* Public Subnet 3 cidr:'
+      VPCPublicSubnet4:
+        default: '* Build Public Subnet 4?:'
+      VPCPublicSubnet4cidr:
+        default: '* Public Subnet 3 cidr:'
+      VPCPrivateSubnet1cidr:
+        default: '* Private Subnet 1 cidr'
+      VPCPrivateSubnet2cidr:
+        default: '* Private Subnet 2 cidr:'
+      VPCPrivateSubnet3cidr:
+        default: '* Private Subnet 3 cidr:'
+      VPCPrivateSubnet4cidr:
+        default: '* Private Subnet 4 cidr:'        
+      VPCPrivateSubnet5cidr:
+        default: '* Private Subnet 5 cidr:'
+      VPCPrivateSubnet6cidr:
+        default: '* Private Subnet 6 cidr:'
+      VPCPrivateSubnet7cidr:
+        default: '* Private Subnet 7 cidr:'
+      VPCPrivateSubnet8cidr:
+        default: '* Private Subnet 8 cidr:'
+      VPCPrivateSubnet9cidr:
+        default: '* Private Subnet 9 cidr:'
+      VPCPrivateSubnet10cidr:
+        default: '* Private Subnet 10 cidr:'
+      VPCPrivateSubnet11:
+        default: '* Build Private Subnet 11?:'
+      VPCPrivateSubnet11cidr:
+        default: '* Private Subnet 11 cidr:'
+      VPCPrivateSubnet12:
+        default: '* Build Private Subnet 12?:' 
+      PeeringConnections:
+        default: '* Setup VPC Peering?'         
+      PeeringVPCID:
+        default: '* Peering Account VPC ID:'
+      PeeringRegion:
+        default: '* Peering Region:'
+      PeerOwnerId:
+        default: '* Peering Account ID:'
+      PeeringRoleArn:
+        default: '* Peering Account Role ARN:'                
+      JumpBoxLinux:
+        default: '* Launch a Unix Jump Box?'
+      JumpBoxName:
+        default: Name tag for Unix Jump Instance
+      JumpBoxType:
+        default: 'Instance Type for Unix Jump:'
+      JumpVolumeSize:
+        default: Unix Jump Root Volume Size
+      JumpBoxUserData:
+        default: 'Unix Jump Userdata:'
+Conditions:
+  HasKeyName: !Not 
+    - !Equals 
+      - ''
+      - !Ref KeyName
+  PeergRoleArn: !Not 
+    - !Equals 
+      - ''
+      - !Ref PeeringRoleArn            
+  LaunchJumpBox: !Equals 
+    - !Ref JumpBoxLinux
+    - 'Yes'
+  SetupVPCPeering: !Equals 
+    - !Ref PeeringConnections
+    - 'Yes'    
+  Make3rdPubSubnet: !Equals 
+    - !Ref VPCPublicSubnet3
+    - 'Yes'
+  Make4thPubSubnet: !Equals 
+    - !Ref VPCPublicSubnet4
+    - 'Yes'
+  Make11thPrivSubnet: !Equals 
+    - !Ref VPCPrivateSubnet11
+    - 'Yes'
+  Make12thPrivSubnet: !Equals 
+    - !Ref VPCPrivateSubnet12
+    - 'Yes'    
+Mappings:
+  NatAMI:
+    us-east-1:
+      AMI: ami-8079fd97
+    us-east-2:
+      AMI: ami-73257f16
+    us-west-2:
+      AMI: ami-6afd3d0a
+    us-west-1:
+      AMI: ami-07e9ae67
+    ca-central-1:
+      AMI: ami-c3d469a7
+    eu-west-1:
+      AMI: ami-e0ee8a93
+    eu-west-2:
+      AMI: ami-4fb4be2b
+    eu-central-1:
+      AMI: ami-cdfe14a2
+    ap-southeast-1:
+      AMI: ami-c11dc0a2
+    ap-southeast-2:
+      AMI: ami-08c8e36b
+    ap-northeast-1:
+      AMI: ami-f115e790
+    ap-northeast-2:
+      AMI: ami-acaa60c2
+    sa-east-1:
+      AMI: ami-16cc587a
+    ap-south-1:
+      AMI: ami-5aec8635
+Resources:
+  VPC:
+    Type: 'AWS::EC2::VPC'
+    Properties:
+      CidrBlock: !Ref VPCNETWORK
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub MC-${Env}
+  PubSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      MapPublicIpOnLaunch: !Ref AutoAssignPubIP
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPublicSubnet1cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-PUB-AZ1
+  PubSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      MapPublicIpOnLaunch: !Ref AutoAssignPubIP
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPublicSubnet2cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-PUB-AZ2
+  PubSubnet3:
+    Type: 'AWS::EC2::Subnet'
+    Condition: Make3rdPubSubnet
+    Properties:
+      MapPublicIpOnLaunch: !Ref AutoAssignPubIP
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPublicSubnet3cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-PUB2-AZ1
+  PubSubnet4:
+    Type: 'AWS::EC2::Subnet'
+    Condition: Make4thPubSubnet
+    Properties:
+      MapPublicIpOnLaunch: !Ref AutoAssignPubIP
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPublicSubnet4cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-PUB2-AZ2
+  PrivSubnet1:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet1cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-EMR-AZ1
+  PrivSubnet2:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet2cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-EMR-AZ2
+  PrivSubnet3:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet3cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-INF-DB-AZ1
+  PrivSubnet4:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet4cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-INF-DB-AZ2
+  PrivSubnet5:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet5cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-INF-FE-AZ1
+  PrivSubnet6:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet6cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC--INF-FE-AZ2          
+  PrivSubnet7:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet7cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-LAMBDA-AZ1
+  PrivSubnet8:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet8cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-RSHIFT-AZ1
+  PrivSubnet9:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ1
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet9cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-TAB-FE-AZ1
+  PrivSubnet10:
+    Type: 'AWS::EC2::Subnet'
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet10cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-TAB-FE-AZ2
+  PrivSubnet11:
+    Type: 'AWS::EC2::Subnet'
+    Condition: Make11thPrivSubnet
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet11cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-LAMBDA-AZ2
+  PrivSubnet12:
+    Type: 'AWS::EC2::Subnet'
+    Condition: Make12thPrivSubnet
+    Properties:
+      AvailabilityZone: !Ref AZ2
+      VpcId: !Ref VPC
+      CidrBlock: !Ref VPCPrivateSubnet12cidr
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Sub ${Env}-MC-RSHIFT-AZ2                                                          
+  InternetGateway:
+    Type: 'AWS::EC2::InternetGateway'
+    Properties:
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  AttachGateway:
+    Type: 'AWS::EC2::VPCGatewayAttachment'
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  PubRouteTable1:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref 'AWS::StackName'
+              - '-PublicRoute-1'
+  MainRouteTable:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref 'AWS::StackName'
+              - '-MainRouteTable'              
+  PrivRouteTable1:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref 'AWS::StackName'
+              - '-PrivateRoute-1'
+  PrivRouteTable2:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref 'AWS::StackName'
+              - '-PrivateRoute-2'
+  PrivRouteTable3:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref 'AWS::StackName'
+              - '-PrivateRoute-3' 
+  PrivRouteTable4:
+    Type: 'AWS::EC2::RouteTable'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Join 
+            - ''
+            - - !Ref 'AWS::StackName'
+              - '-PrivateRoute-4'                           
+  PubRoute1:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PubRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+  MainRoute:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref MainRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway      
+  PrivRoute1:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PrivRouteTable1
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+  PrivRoute2:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PrivRouteTable2
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+  PrivRoute3:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PrivRouteTable3
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway
+  PrivRoute4:
+    Type: 'AWS::EC2::Route'
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref PrivRouteTable4
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NATGateway            
+  PubRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PubSubnet1
+      RouteTableId: !Ref PubRouteTable1
+  PubSubnetRouteTableAssociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PubSubnet2
+      RouteTableId: !Ref PubRouteTable1
+  PubRouteTableAssociation3:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Condition: Make3rdPubSubnet
+    Properties:
+      SubnetId: !Ref PubSubnet3
+      RouteTableId: !Ref PubRouteTable1
+  PubSubnetRouteTableAssociation4:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Condition: Make4thPubSubnet
+    Properties:
+      SubnetId: !Ref PubSubnet4
+      RouteTableId: !Ref PubRouteTable1
+  PrivSubnetRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet3
+      RouteTableId: !Ref PrivRouteTable1
+  PrivSubnetRouteTableAssociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet4
+      RouteTableId: !Ref PrivRouteTable2
+  PrivSubnetRouteTableAssociation3:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet5
+      RouteTableId: !Ref PrivRouteTable3
+  PrivSubnetRouteTableAssociation31:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet6
+      RouteTableId: !Ref PrivRouteTable3
+  PrivSubnetRouteTableAssociation32:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet9
+      RouteTableId: !Ref PrivRouteTable3           
+  PrivSubnetRouteTableAssociation4:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet10
+      RouteTableId: !Ref PrivRouteTable4
+  PrivSubnetMainRouteTableAssociation1:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet1
+      RouteTableId: !Ref MainRouteTable 
+  PrivSubnetMainRouteTableAssociation2:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet2
+      RouteTableId: !Ref MainRouteTable 
+  PrivSubnetMainRouteTableAssociation3:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet7
+      RouteTableId: !Ref MainRouteTable 
+  PrivSubnetMainRouteTableAssociation4:
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet8
+      RouteTableId: !Ref MainRouteTable 
+  PrivSubnetMainRouteTableAssociation5:
+    Condition: Make11thPrivSubnet
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet11
+      RouteTableId: !Ref MainRouteTable 
+  PrivSubnetMainRouteTableAssociation6:
+    Condition: Make12thPrivSubnet
+    Type: 'AWS::EC2::SubnetRouteTableAssociation'
+    Properties:
+      SubnetId: !Ref PrivSubnet12
+      RouteTableId: !Ref MainRouteTable 
+  NetworkAcl:
+    Type: 'AWS::EC2::NetworkAcl'
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  InboundResponsePortsNetworkAclEntry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAcl
+      RuleNumber: '100'
+      Protocol: '-1'
+      RuleAction: allow
+      Egress: 'false'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  OutBoundResponsePortsNetworkAclEntry:
+    Type: 'AWS::EC2::NetworkAclEntry'
+    Properties:
+      NetworkAclId: !Ref NetworkAcl
+      RuleNumber: '100'
+      Protocol: '-1'
+      RuleAction: allow
+      Egress: 'true'
+      CidrBlock: 0.0.0.0/0
+      PortRange:
+        From: '0'
+        To: '65535'
+  SubnetNetworkAclAssociation:
+    Type: 'AWS::EC2::SubnetNetworkAclAssociation'
+    Properties:
+      SubnetId: !Ref PubSubnet1
+      NetworkAclId: !Ref NetworkAcl
+  NATGWIP:
+    Type: 'AWS::EC2::EIP'
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+  JumpBoxIP:
+    Type: 'AWS::EC2::EIP'
+    Condition: LaunchJumpBox
+    DependsOn: AttachGateway
+    Properties:
+      Domain: vpc
+      InstanceId: !Ref LinuxJumpHostInstance
+  MGMEM7SecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: >-
+        Allow EM7 collector from MGT environment access
+      SecurityGroupIngress:
+        - IpProtocol: udp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 10.192.12.21/32
+        - IpProtocol: udp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 54.209.239.124/32
+        - IpProtocol: udp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 52.1.119.157/32          
+        - IpProtocol: tcp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 10.192.12.21/32
+        - IpProtocol: tcp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 54.209.239.124/32
+        - IpProtocol: tcp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 10.192.11.103/32
+        - IpProtocol: tcp
+          FromPort: '161'
+          ToPort: '162'
+          CidrIp: 10.192.11.193/32
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 10.192.12.21/32
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 54.209.239.124/32         
+      Tags:
+        - Key: Name
+          Value: Allow-MGT-EM7-EC2
+        - Key: Environment
+          Value: !Ref Env      
+  LinuxSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: >-
+        To allow access from the Tiffany Offices to Linux Instances
+      SecurityGroupIngress:        
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.160.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 10.160.0.0/16
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 172.16.0.0/12        
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-Linux-${Env}
+        - Key: Environment
+          Value: !Ref Env                
+  JumpBastionSecurityGroup:
+    Condition: LaunchJumpBox
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: >-
+        Allow VPC to route through the NAT instance and allow inbound SSH to the
+        NAT Instance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 217.72.241.183/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 66.70.104.94/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 66.70.1.47/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 63.131.154.55/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 72.36.244.8/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 85.133.14.254/32
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 217.72.241.183/32
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 66.70.104.94/32
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 66.70.1.47/32
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 63.131.154.55/32
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 72.36.244.8/32
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: 85.133.14.254/32
+      Tags:
+        - Key: Name
+          Value: DatapipeAdminSecurityGroup
+        - Key: Environment
+          Value: !Ref Env
+  ClientAccessSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Condition: LaunchJumpBox
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: >-
+        Allow VPC to route through the NAT instance and allow inbound SSH to the
+        NAT Instance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: !Ref ClientAccess
+        - IpProtocol: tcp
+          FromPort: '3389'
+          ToPort: '3389'
+          CidrIp: !Ref ClientAccess
+      Tags:
+        - Key: Name
+          Value: ClientAccessSecurityGroup
+        - Key: Environment
+          Value: !Ref Env
+  LinuxJumpHostInstance:
+    Type: 'AWS::EC2::Instance'
+    Condition: LaunchJumpBox
+    DependsOn: AttachGateway
+    Metadata:
+      Comment: Create our Jumpbox
+    Properties:
+      ImageId: !FindInMap 
+        - NatAMI
+        - !Ref 'AWS::Region'
+        - AMI
+      InstanceType: !Ref JumpBoxType
+      UserData: !Ref JumpBoxUserData
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: !Ref JumpVolumeSize
+            VolumeType: gp2
+      KeyName: !If 
+        - HasKeyName
+        - !Ref KeyName
+        - !Ref 'AWS::NoValue'
+      SourceDestCheck: 'false'
+      NetworkInterfaces:
+        - GroupSet:
+            - !Ref JumpBastionSecurityGroup
+            - !Ref ClientAccessSecurityGroup
+          AssociatePublicIpAddress: 'true'
+          DeviceIndex: '0'
+          DeleteOnTermination: 'true'
+          SubnetId: !Ref PubSubnet1
+      Tags:
+        - Key: Name
+          Value: !Ref JumpBoxName
+        - Key: Environment
+          Value: !Ref Env
+        - Key: StackName
+          Value: !Ref 'AWS::StackName'
+  NATGateway:
+    Type: 'AWS::EC2::NatGateway'
+    Properties:
+      AllocationId: !GetAtt 
+        - NATGWIP
+        - AllocationId
+      SubnetId: !Ref PubSubnet1
+      Tags:
+        - Key: Application
+          Value: !Ref 'AWS::StackId'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Name
+          Value: !Ref 'AWS::StackName'
+  VPCPeeringConnection:
+    Condition: SetupVPCPeering
+    Type: AWS::EC2::VPCPeeringConnection
+    Properties:
+      VpcId: !Ref VPC
+      PeerVpcId: !Ref PeeringVPCID
+      PeerRegion: !Ref PeeringRegion 
+      PeerOwnerId: !Ref PeerOwnerId
+      PeerRoleArn: !If 
+        - PeergRoleArn
+        - !Ref PeeringRoleArn
+        - !Ref 'AWS::NoValue'      
+      Tags:
+        - Key: Name
+          Value: !Sub 'MC-${Env} to MGMT'
+        - Key: Environment
+          Value: !Ref Env
+        - Key: StackName
+          Value: !Ref 'AWS::StackName'
+  PeeringRoute1:
+    Condition: SetupVPCPeering    
+    Type: 'AWS::EC2::Route'
+    DependsOn: 
+      - AttachGateway
+      - VPCPeeringConnection
+    Properties:
+      RouteTableId: !Ref PrivRouteTable1
+      DestinationCidrBlock: 10.192.0.0/16
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection 
+  PeeringRoute2:
+    Condition: SetupVPCPeering    
+    Type: 'AWS::EC2::Route'
+    DependsOn: 
+      - AttachGateway
+      - VPCPeeringConnection
+    Properties:
+      RouteTableId: !Ref PrivRouteTable2
+      DestinationCidrBlock: 10.192.0.0/16
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection
+  PeeringRoute3:
+    Condition: SetupVPCPeering    
+    Type: 'AWS::EC2::Route'
+    DependsOn: 
+      - AttachGateway
+      - VPCPeeringConnection
+    Properties:
+      RouteTableId: !Ref PrivRouteTable3
+      DestinationCidrBlock: 10.192.0.0/16
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection
+  PeeringRoute4:
+    Condition: SetupVPCPeering    
+    Type: 'AWS::EC2::Route'
+    DependsOn: 
+      - AttachGateway
+      - VPCPeeringConnection
+    Properties:
+      RouteTableId: !Ref PrivRouteTable4
+      DestinationCidrBlock: 10.192.0.0/16
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection
+  PeeringRoute5:
+    Condition: SetupVPCPeering    
+    Type: 'AWS::EC2::Route'
+    DependsOn: 
+      - AttachGateway
+      - VPCPeeringConnection
+    Properties:
+      RouteTableId: !Ref MainRouteTable
+      DestinationCidrBlock: 10.192.0.0/16
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection                
+  PeeringPublicRoute1:
+    Condition: SetupVPCPeering    
+    Type: 'AWS::EC2::Route'
+    DependsOn: 
+      - AttachGateway
+      - VPCPeeringConnection
+    Properties:
+      RouteTableId: !Ref PubRouteTable1
+      DestinationCidrBlock: 10.192.0.0/16
+      VpcPeeringConnectionId: !Ref VPCPeeringConnection 
+  VPCEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: '*'
+            Resource: '*'
+      RouteTableIds:
+        - !Ref PrivRouteTable1
+        - !Ref PrivRouteTable2
+        - !Ref PrivRouteTable3
+        - !Ref PrivRouteTable4
+        - !Ref MainRouteTable               
+      ServiceName: !Join 
+        - ''
+        - - com.amazonaws.
+          - !Ref 'AWS::Region'
+          - .s3
+      VpcId: !Ref VPC  
+Outputs:
+  VPCID:
+    Description: VPC Information
+    Value: !Ref VPC
+  LinuxJumphost:
+    Description: Linux Jump Host
+    Condition: LaunchJumpBox
+    Value: !Join 
+      - ''
+      - - !Ref LinuxJumpHostInstance
+        - ' ( EIP '
+        - !Ref JumpBoxIP
+        - ' )'
+  NATGWIP:
+    Description: Nat / Jump Host
+    Value: !Join 
+      - ''
+      - - !Ref NATGateway
+        - ' ( EIP '
+        - !Ref NATGWIP
+        - ' )'
+  LinuxSecurityGroup:
+    Description: Linux Security Group
+    Value: !Ref LinuxSecurityGroup   
+  MGMEM7SecurityGroup:
+    Description: MGT Security Group
+    Value: !Ref MGMEM7SecurityGroup  
+  PublicSubnet1:
+    Description: Public Subnet 1 Information
+    Value: !Join 
+      - ''
+      - - !Ref PubSubnet1
+        - ' ('
+        - !Ref AZ1
+        - ') '
+        - !Ref VPCPublicSubnet1cidr
+  PublicSubnet2:
+    Description: Public Subnet 2 Information
+    Value: !Join 
+      - ''
+      - - !Ref PubSubnet2
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPublicSubnet2cidr
+  PublicSubnet3:
+    Condition: Make3rdPubSubnet
+    Description: Public Subnet 3 Information
+    Value: !Join 
+      - ''
+      - - !Ref PubSubnet3
+        - ' ('
+        - !Ref AZ1
+        - ') '
+        - !Ref VPCPublicSubnet3cidr
+  PublicSubnet4:
+    Condition: Make4thPubSubnet
+    Description: Public Subnet 4 Information
+    Value: !Join 
+      - ''
+      - - !Ref PubSubnet4
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPublicSubnet4cidr
+  PrivateSubnet1:
+    Description: Private Subnet 1 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet1
+        - ' ('
+        - !Ref AZ1
+        - ') '
+        - !Ref VPCPrivateSubnet1cidr
+  PrivateSubnet2:
+    Description: Private Subnet 2 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet2
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet2cidr
+  PrivateSubnet3:
+    Description: Private Subnet 3 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet3
+        - ' ('
+        - !Ref AZ1
+        - ') '
+        - !Ref VPCPrivateSubnet3cidr
+        - ' - '
+        - !Ref PrivRouteTable1
+  PrivateSubnet4:
+    Description: Private Subnet 4 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet4
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet4cidr
+        - ' - '
+        - !Ref PrivRouteTable2
+  PrivateSubnet5:
+    Description: Private Subnet 5 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet5
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet5cidr
+        - ' - '
+        - !Ref PrivRouteTable3
+  PrivateSubnet6:
+    Description: Private Subnet 6 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet6
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet6cidr
+        - ' - '
+        - !Ref PrivRouteTable3
+  PrivateSubnet7:
+    Description: Private Subnet 7 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet7
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet7cidr
+  PrivateSubnet8:
+    Description: Private Subnet 8 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet8
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet8cidr
+  PrivateSubnet9:
+    Description: Private Subnet 9 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet9
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet9cidr
+        - ' - '
+        - !Ref PrivRouteTable3
+  PrivateSubnet10:
+    Description: Private Subnet 10 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet10
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet10cidr
+        - ' - '
+        - !Ref PrivRouteTable4
+  PrivateSubnet11:
+    Condition: Make11thPrivSubnet
+    Description: Private Subnet 11 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet11
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet11cidr
+  PrivateSubnet12:
+    Condition: Make12thPrivSubnet
+    Description: Private Subnet 12 Information
+    Value: !Join 
+      - ''
+      - - !Ref PrivSubnet12
+        - ' ('
+        - !Ref AZ2
+        - ') '
+        - !Ref VPCPrivateSubnet12cidr                 
+  ClientNetwork:
+    Description: Client Access SSH and RDP
+    Value: !Join 
+      - ''
+      - - !Ref ClientAccess
+  KeyPair:
+    Condition: LaunchJumpBox
+    Description: Keypair used for instances
+    Value: !Ref KeyName
