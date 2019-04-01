@@ -1,9 +1,9 @@
-if [ $# -ne 5 ];then
-  echo -e "usage: ${BASH_SOURCE[0]} stack_name cfn_template_file parameter_file Application operation"
-  echo -e "e.g ${BASH_SOURCE[0]} RStudioDev RStudio.cfn.json RStudioDev.par RStudio create"
-  echo -e "e.g ${BASH_SOURCE[0]} RStudioProd RStudio.cfn.json RStudioProd.par RStudio update"
-  echo -e "e.g ${BASH_SOURCE[0]} MontyCloudTeamDev MontyCloudTeam.cfn.json none staging-build create"
-  echo -e "e.g ${BASH_SOURCE[0]} MontyCloudTeamDev MontyCloudTeam.cfn.yaml none staging-build update"
+if [ $# -ne 6 ];then
+  echo -e "usage: ${BASH_SOURCE[0]} stack_name cfn_template_file parameter_file Application operation timeout_in_minutes"
+  echo -e "e.g ${BASH_SOURCE[0]} RStudioDev RStudio.cfn.json RStudioDev.par RStudio create 15"
+  echo -e "e.g ${BASH_SOURCE[0]} RStudioProd RStudio.cfn.json RStudioProd.par RStudio update  15"
+  echo -e "e.g ${BASH_SOURCE[0]} MontyCloudTeamDev MontyCloudTeam.cfn.json none staging-build create 15"
+  echo -e "e.g ${BASH_SOURCE[0]} MontyCloudTeamDev MontyCloudTeam.cfn.yaml none staging-build update 15"
   echo -e "e.g ${BASH_SOURCE[0]} Poc ec2.cfn.json ec2.par poc create"
   exit 1
 fi
@@ -21,10 +21,12 @@ fi
 
 Application=${4}
 operation=${5}
+timeout_in_minutes=${6}
+
 if [ ${operation} = 'create' ]; then
-	cmd="aws cloudformation create-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM --timeout-in-minutes 15 --tags Key=Application,Value=${Application} --enable-termination-protection"
+	cmd="aws cloudformation create-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM --timeout-in-minutes ${timeout_in_minutes} --tags Key=Application,Value=${Application} --enable-termination-protection"
 elif [ ${operation} = 'update' ]; then
-	cmd="aws cloudformation update-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM"
+	cmd="aws cloudformation update-stack --stack-name ${stack_name}  --template-body file://./${cfn_template_file} ${parameters} --capabilities CAPABILITY_NAMED_IAM" --timeout-in-minutes ${timeout_in_minutes}
 else 
 	echo "Invalid value entered for operation ... exiting" ; exit 1
 fi

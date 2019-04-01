@@ -31,8 +31,21 @@ for i in adatta viksingh ; do
 	ADMINS="$ADMINS,$i"
 done
 
+user_accounts="adatta,csett"
+field_separator=$IFS
+IFS=,
+
+for i in $user_accounts; do
+  useradd -m -G ssh_access $i
+	echo "$i:T!emp123" | chpasswd
+	passwd -e $i
+done
+
+IFS=$field_separator
+
 echo -e "\nUser_Alias ADMINS=$ADMINS" >> /etc/sudoers
 echo -e "\nADMINS ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+echo -e "\nUser_Alias ES_ADMINS=$user_accounts" >> /etc/sudoers
 
 #set timezone
 timedatectl set-timezone America/New_York
@@ -65,8 +78,8 @@ cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudW
 yum install -y sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools
 
 #set hostname
-#for some reason, even though these commands seem to get executed, unless I explicitly run hostnamectl set-hostname ${host_name} again , the hostname change do not seem to take effect.
-region="us-east-1"
+#region="us-east-1"
+region=$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $(NF-1)}')
 ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 host_name=$(/usr/local/bin/aws ec2 --region ${region}  describe-tags --filters Name=resource-id,Values=${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)
 hostnamectl set-hostname ${host_name}
@@ -82,4 +95,5 @@ echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
 
 # *********NOTE: Enable password based Authentication
 #update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using the following command: systemctl restart sshd
-
+echo "PasswordAuthentication yes" >> /etc/ssh/sshd_config
+systemctl restart sshd

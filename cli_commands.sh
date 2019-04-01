@@ -22,6 +22,8 @@ aws ecs describe-task-definition --task-definition ktdev-app #task-name, by defa
 
 aws ecs list-services --cluster ecs-dev #cluster-name
 
+aws ecs update-service --cluster ecs-something --service my-http-service --task-definition amazon-ecs-sample
+
 #ECR
 aws ecr get-login
 aws ecr describe-repositories
