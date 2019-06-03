@@ -90,10 +90,10 @@
 	},
 	"Mappings": {
 		"EnvironmentMap": {
-			"dev": { "VpcId": "vpc-6057bd06" ,"SshKey": "TCO-NONPROD" , "InitCap": "Dev" },
-			"qa": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Qa" }, 
-			"poc": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Poc" },
-			"prod": { "VpcId" :"vpc-f4682392", "SshKey": "TCO-PROD", "InitCap": "Prod" }
+			"dev": { "VpcId": "vpc-6057bd06" ,"SshKey": "TCO-NONPROD" , "InitCap": "Dev" , "UpperCase": "DEV" },
+			"qa": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Qa", "UpperCase": "QA" }, 
+			"poc": { "VpcId": "vpc-6057bd06", "SshKey": "TCO-NONPROD", "InitCap": "Poc","UpperCase": "POC" },
+			"prod": { "VpcId" :"vpc-f4682392", "SshKey": "TCO-PROD", "InitCap": "Prod","UpperCase": "PROD" }
 		},
 		"VolumeResourceDeletionMap": {
 			"true": { "Policy" : "Delete" },
@@ -183,6 +183,10 @@
 				{
 					"Key": "Application",
 					"Value": { "Ref": "Application"}
+				},
+				{
+					"Key": "Environment",
+					"Value": { "Fn::FindInMap" : [ "EnvironmentMap", { "Ref" : "Environment" },"UpperCase" ]}
 				},
 				{
 					"Key": "Name",
