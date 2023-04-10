@@ -1,0 +1,961 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  The primary stack which triggers the 8 Nested Stacks such as ECR, S3 Bucket, INF BDM, Redshift, OracleRDS, EMR and MySQL to brign up the EDH Infrastructure in the Tiffany environment.
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: General Configuration * Indicates a required Entry
+        Parameters:
+          - KeyName
+          - Env  
+          - Application   
+      - Label:
+          default: Cloudformation Stack Configuration
+        Parameters:
+          - ECRStack
+          - INFBDMS3Stack       
+          - RedshiftStack 
+          - MySQLEMRStack                                  
+      - Label:
+          default: EDH Informatica Server Configuration
+        Parameters:
+          - EDHINFInstanceType
+          - EDHINFServerName
+          - EDHINFImageId
+          - ESSSMParameterName
+          - EDHUsersList
+      - Label:
+          default: RDS Oracle Database Configuration
+        Parameters:
+          - RDSOracleEngineVersion
+          - RDSOracleDBInstanceIdentifier
+          - RDSOracleDBInstanceClass
+          - RDSOracleAllocatedStorage
+          - RDSOracleLicenseModel
+          - RDSOracleDBName
+          - RDSOracleMultiAZ
+          - RDSOracleMasterUsername
+          - EDHOracleRDUserPasswordPSName
+          - RDSOraclePreferredMaintenanceWindow 
+          - RDSOraclePreferredBackupWindow
+          - RDSOracleBackupRetentionPeriod
+      - Label:
+          default: MySQL RDS Configuration
+        Parameters:
+          - RDSMySQLDBInstanceClass
+          - RDSMySQLDBInstanceIdentifier
+          - RDSMySQLEngineVersion
+          - RDSMySQLAllocatedStorage
+          - RDSMySQLMasterUsername
+          - EDHMySQLRDSUserPasswordPSName
+          - RDSMySQLDBName
+          - RDSMySQLMultiAZ
+          - RDSMySQLBackupRetentionPeriod
+          - RDSMySQLPreferredBackupWindow
+          - RDSMySQLPreferredMaintenanceWindow
+      - Label:
+          default: EMR Configuration
+        Parameters:
+          - EMRClusterName
+          - EMRMasterInstanceType
+          - EMRCoreInstanceType
+          - EMRNumberOfCoreInstances
+          - EMREBSRootVolumeSize  
+          - EMRReleaseLabel   
+          - EMRTLSCertificateobjectUrl
+          - EMRBootStrapAction  
+          - S3EDHEMRScriptsBucketName                              
+      - Label:
+          default: Redshift Configuration
+        Parameters:
+          - RedshiftNumberOfNodes
+          - RedshiftNodeType
+          - RedshiftMasterUsername
+          - EDHRedshiftUserPasswordPSName
+          - RedshiftClusterName  
+          - RedshiftSnapshotRetentionPeriod   
+          - RedshiftMaintenanceWindow             
+      - Label:
+          default: Cloudformation Path Configuration 
+        Parameters:
+          - CFTS3BucketName
+          - CFTS3KeyPrefix  
+      - Label:
+          default: Tagging Configuration
+        Parameters:
+          - EDHTCOTagKey
+          - EDHTCOTagValue 
+      - Label:
+          default: Master VPC Cloudformation Stack
+        Parameters:
+          - EDHTCOVPCMasterStack                                                                    
+Parameters:
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH   
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key   
+    Default: Vendor  
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value   
+    Default: MontyCloud
+  ECRStack:
+    Default: 'Yes'
+    Description: Do we need a ECR Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'           
+  INFBDMS3Stack:
+    Default: 'Yes'
+    Description: Do we need a Informatica BDM Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'      
+  RedshiftStack:
+    Default: 'Yes'
+    Description: Do we need a Redshift Cluster Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No' 
+  MySQLEMRStack:
+    Default: 'Yes'
+    Description: Do we need a EMR Cluster Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'                                   
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instance
+    Type: 'AWS::EC2::KeyPair::KeyName' 
+    ConstraintDescription: must be an existing EC2 KeyPair.   
+  Env:
+    Description: 'The type of Environment? ex: QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - QA
+      - DEV
+    Default: STG
+    ConstraintDescription: Should be at least 1 Character 
+  ESSSMParameterName:
+    Type: String
+    Description: SSM Parameters Store Name 
+    Default: agent-config-linux         
+  EDHINFInstanceType:
+    Description: EDH Informatica BDM
+    Type: String
+    Default: m4.large
+    ConstraintDescription: must be a valid EC2 instance type.
+  EDHINFServerName:
+    Type: String
+    Description: EC2 Instance Name
+    Default: AMZLINEDHT01 
+  EDHUsersList:
+    Type: String
+    Description: Linux User Account for Informatica BDM Server.
+    Default: 'adatta,csett,skarmaka,droglier,nirchoud,mkundu,negupta,rprakash,sbanerje,vreddy, tsurekha,sbhooshi,sbhooshi,pujeyara,smuthusa,lsahoo,speddapa,rgalanna,mcuser'    
+  EDHINFImageId:
+    Type: 'String'
+    Description: The unique ID of the Amazon Machine Image (AMI) that was assigned during registration.  
+  RDSOracleEngineVersion:
+    Description: Engine version
+    Default: 12.1.0.2.v6
+    Type: String
+  RDSOracleDBInstanceIdentifier:
+    Description: DB Instance Identifier
+    Type: String
+    Default: amzdbedht01
+  RDSOracleDBInstanceClass:
+    Description: The RDS instance type.
+    Type: String
+    Default: db.m4.large
+    ConstraintDescription: must select a valid database instance type.
+  RDSOracleAllocatedStorage:
+    Description: Allocate Storage (GiB)
+    Type: String
+    MinLength: '1'
+    MaxLength: '5'    
+    Default: 50
+  RDSOracleLicenseModel:
+    Type: String
+    Description: LicenseModel for the Oracle RDS
+    AllowedValues:
+     - license-included
+     - bring-your-own-license
+    Default: license-included      
+  RDSOracleMasterUsername:
+    Description: Oracle RDS Masteruser Name for DB login
+    Type: String
+    Default: oracle
+  EDHOracleRDUserPasswordPSName:
+    Type: AWS::SSM::Parameter::Name
+    Description: Parameter Store Name for the Oracle RDS Master user Password.
+  RDSOracleDBName:
+    Description: The name of the first database to be created.
+    Type: String
+    Default: ORACL1    
+  RDSOraclePreferredMaintenanceWindow:  
+    Description: The weekly time range during which system maintenance can occur.
+    Type: 'String'
+    Default: 'sun:07:00-sun:08:00' 
+  RDSOraclePreferredBackupWindow:
+    Description: The daily time range during which automated backups are performed.
+    Type: 'String'
+    Default: '04:00-05:00'
+  RDSOracleBackupRetentionPeriod:
+    Description: The number of days the automated snapshots needs to be retained.
+    Type: 'String'
+    MinLength: 1
+    MaxLength: 3
+    Default: '20' 
+  RDSOracleMultiAZ:
+    Description: MultiAZ option check for the Oracle RDS instance
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'    
+  RedshiftNumberOfNodes:
+    Description: The number of compute nodes in the cluster. For multi-node clusters,
+      the NumberOfNodes parameter must be greater than 1
+    Type: Number
+    Default: '3'
+  RedshiftNodeType:
+    Description: The type of node to be provisioned
+    Type: String
+    Default: dc1.large
+  RedshiftMasterUsername:
+    Description: The user name that is associated with the master user account for
+      the cluster that is being created
+    Type: String
+    Default: master
+    AllowedPattern: "([a-z])([a-z]|[0-9])*"
+  EDHRedshiftUserPasswordPSName:
+    Type: AWS::SSM::Parameter::Name 
+    Description: Parameter Store Name for the Redshift Cluster Master user Password.
+  RedshiftClusterName:
+    Description: The unique identifier for the cluster.
+    Type: String
+    Default: amzlrsedht01  
+  RedshiftSnapshotRetentionPeriod:
+    Description: The number of days the automated snapshots needs to be retained.
+    Type: 'String'
+    MinLength: 1
+    MaxLength: 3
+    Default: '20'
+  RedshiftMaintenanceWindow:
+    Description: The weekly time range during which automated cluster maintenance can occur.
+    Type: 'String'
+    Default: 'sun:07:00-sun:08:00' 
+  RDSMySQLEngineVersion:
+    Description: Engine version
+    Default: 5.7.16
+    Type: String
+  RDSMySQLDBInstanceIdentifier:
+    Description: DB Instance Identifier
+    Type: String
+    Default: amzdbedht02
+  RDSMySQLDBName:
+    Description: The name of the first database to be created for MySQL RDS.
+    Type: String
+    Default: hive    
+  RDSMySQLDBInstanceClass:
+    Description: The RDS instance type.
+    Type: String
+    Default: db.r5.large
+    ConstraintDescription: must select a valid database instance type.
+  RDSMySQLAllocatedStorage:
+    Description: Allocate Storage (GiB)
+    Type: String
+    MinLength: '1'
+    MaxLength: '5'    
+    Default: 100
+  RDSMySQLMasterUsername:
+    Description: Option Group Details
+    Type: String
+    Default: hive
+  EDHMySQLRDSUserPasswordPSName:
+    Type: AWS::SSM::Parameter::Name 
+    Description: Secure String Password Version for the MySQL RDS Master user Password  
+  RDSMySQLPreferredMaintenanceWindow:  
+    Description: The weekly time range during which system maintenance can occur.
+    Type: 'String'
+    Default: 'thu:04:12-thu:04:42' 
+  RDSMySQLPreferredBackupWindow:
+    Description: The daily time range during which automated backups are performed.
+    Type: 'String'
+    Default: '04:54-05:24'
+  RDSMySQLMultiAZ:
+    Description: MultiAZ option check for the MySQL RDS instance
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'    
+  RDSMySQLBackupRetentionPeriod:
+    Description: The number of days the automated snapshots needs to be retained.
+    Type: 'String'
+    MinLength: 1
+    MaxLength: 3
+    Default: '20' 
+  EMRClusterName:
+    Description: Name of the cluster
+    Type: String
+    Default: AMZEMREDHT01     
+  EMRMasterInstanceType:
+    Description: Instance type to be used for the master instance.
+    Type: String
+    Default: m4.xlarge
+    ConstraintDescription: Please Choose a Valid instance Type.
+  EMRCoreInstanceType:
+    Description: Instance type to be used for core instances.
+    Type: String
+    Default: m4.2xlarge
+    ConstraintDescription: Please choose a valid instance type.
+  EMRNumberOfCoreInstances:
+    Description: Must be a valid number
+    Type: Number
+    Default: 3          
+  EMREBSRootVolumeSize:
+    Type: String
+    Description: Must be a valid VolumeSize
+    Default: 100
+  EMRReleaseLabel:
+    Description: Must be a valid EMR release version
+    Default: emr-5.0.0
+    Type: String 
+  EMRTLSCertificateobjectUrl:
+    Type: String
+    Description: Must be a Valid S3 Object Url For Emr TLSCertificate.
+    Default: s3://amzs3edhpkg/certs/DevEMRCert_Exp05052018.zip    
+  EMRBootStrapAction:
+    Type: String
+    Description: Provide a valid S3 Path (A list of bootstrap actions that Amazon EMR runs before starting applications on the cluster) 
+    Default: s3://tiffany-edh-environment-build-prerequisites/cloudformation/scripts/bootstrap-stg.sh   
+  S3EDHEMRScriptsBucketName:
+    Type: String
+    Description: Name of the bucket where the EMR scripts are uploaded.          
+  CFTS3BucketName:
+    AllowedPattern: '[a-z0-9-]*'
+    ConstraintDescription: CloudFormation bucket name can include numbers, lowercase
+      letters and hyphens (-). It cannot start or end with a hyphen
+      (-).
+    Description: S3 bucket name for the CloudFormation templates.
+    Type: String
+  CFTS3KeyPrefix:
+    Description: S3 key prefix for the CloudFormation templates.
+    Type: String    
+  EDHTCOVPCMasterStack:
+    Description: >-
+      Name of an active CloudFormation stack that contains the networking
+      resources, such as the subnet and security group, that will be used in
+      this stack.
+    Type: String              
+Mappings: 
+  NameMap: 
+    PROD: 
+      lowecase: "prod"
+    TEST: 
+      lowecase: "test"
+    STG: 
+      lowecase: "stg"
+    DEV: 
+      lowecase: "dev"  
+    QA: 
+      lowecase: "qa" 
+  CamelCaseMap: 
+    PROD: 
+      lowecase: "Prod"
+    TEST: 
+      lowecase: "Test"
+    STG: 
+      lowecase: "Stg"
+    DEV: 
+      lowecase: "Dev"  
+    QA: 
+      lowecase: "Qa"               
+Conditions:
+  S3KeyPrefix: !Not 
+    - !Equals 
+      - ''
+      - !Ref CFTS3KeyPrefix    
+  CreateECRStack: !Equals 
+    - !Ref ECRStack
+    - 'Yes' 
+  CreateINFBDMS3Stack: !Equals 
+    - !Ref INFBDMS3Stack
+    - 'Yes' 
+  CreateRedshiftStack: !Equals 
+    - !Ref RedshiftStack
+    - 'Yes'
+  CreateMySQLEMRStack: !Equals 
+    - !Ref MySQLEMRStack
+    - 'Yes'                                       
+Resources:
+  EDHECRStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateECRStack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ECR-Repo.yaml'
+      Parameters:
+        Env: !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase        
+  EDHESS3BucketStack:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-S3-Bucket.yaml'
+      Parameters:
+        S3EDHMessageRAWBucketName: !Join
+        - ''
+        - - amzs3edhmessagingraw
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHMessageErrorBucketName: !Join
+        - ''
+        - - amzs3edhmessagingerror
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHMessageRefinedBucketName: !Join
+        - ''
+        - - amzs3edhmessagingrefined
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHMessagingRepositoryBucketName: !Join
+        - ''
+        - - amzs3edhmessagingesrepository
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHTricklepollRawBucketName: !Join
+        - ''
+        - - amzs3edhtricklepollraw
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHPkgBucketName: !Join
+        - ''
+        - - amzs3edhpkg
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHSSMBucketName: !Join
+        - ''
+        - - amzs3edhpkg
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - ssm              
+        EDHS3EndpointID:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-S3EndpointID'
+        S3EDHAdobleAnalyticsBucketName: !Join
+        - ''
+        - - amzs3adobeanalytic
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        S3EDHETLBucketName: !Join
+        - ''
+        - - amzs3etl
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - stage
+        S3EDHSASBackupBucketName: !Join
+        - ''
+        - - amzs3sasbackup
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+        EDHBucketName: !Join
+        - ''
+        - - amzs3edh
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase            
+        Env: !Ref 'Env' 
+        Application: !Ref Application
+        EDHTCOTagKey: !Ref EDHTCOTagKey
+        EDHTCOTagValue: !Ref EDHTCOTagValue       
+  EDHRDSOracleDBStack:
+    Type: AWS::CloudFormation::Stack   
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-Oracle-RDS-Instance.yaml'
+      Parameters:
+        RDSOracleVPCID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'
+        RDSSubnetId: !Join 
+          - ','
+          - - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet3'
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet4' 
+        RDSOracleEngine: 'oracle-se2'
+        RDSOracleEngineVersion: !Ref 'RDSOracleEngineVersion'
+        RDSOracleDBInstanceIdentifier: !Ref 'RDSOracleDBInstanceIdentifier'
+        RDSOracleDBInstanceClass: !Ref 'RDSOracleDBInstanceClass'
+        RDSOracleMultiAZ: !Ref RDSOracleMultiAZ
+        RDSOracleLicenseModel: !Ref 'RDSOracleLicenseModel'
+        RDSOracleStorageType: 'gp2'
+        RDSOracleStorageEncrypted: 'true'
+        RDSOracleAllocatedStorage: !Ref 'RDSOracleAllocatedStorage'
+        RDSOracleOptionGroupName: 'default:oracle-se2-12-1'
+        RDSOracleDBName: !Ref RDSOracleDBName
+        RDSOracleMasterUsername: !Ref 'RDSOracleMasterUsername'  
+        EDHOracleRDUserPasswordPSName: !Ref 'EDHOracleRDUserPasswordPSName'  
+        EDHOracleRDUserPasswordPSNameVersion: 1  
+        RDSPreferredMaintenanceWindow: !Ref 'RDSOraclePreferredMaintenanceWindow' 
+        RDSPreferredBackupWindow: !Ref 'RDSOraclePreferredBackupWindow' 
+        RDSBackupRetentionPeriod: !Ref 'RDSOracleBackupRetentionPeriod'
+        RDSAutoMinorVersionUpgrade: false
+        RDSOraclePort: 1521
+        EDHINFSubnetCIDR:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet5Cidr'          
+        EDHEMRSubnetCIDR:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet1Cidr'          
+        Env: !Ref 'Env'  
+        Application: !Ref Application
+        EDHTCOTagKey: !Ref EDHTCOTagKey
+        EDHTCOTagValue: !Ref EDHTCOTagValue                 
+  EDHINFBDMStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateINFBDMS3Stack 
+    DependsOn:
+      - EDHESS3BucketStack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-INF-BDM-Server.yaml'
+      Parameters:
+        VPCID:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'          
+        KeyName: !Ref 'KeyName'
+        InstanceType: !Ref 'EDHINFInstanceType'
+        ServerName: !Ref 'EDHINFServerName'
+        EDHUsersList: !Ref EDHUsersList
+        EDHSubnetId: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet5'     
+        S3EDHScriptsBucketName: !Ref CFTS3BucketName     
+        S3EDHMessageRAWBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRAWBucketName
+        S3EDHMessageRefinedBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRefinedBucketName
+        S3EDHPKGBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHPkgBucketName
+        ESSSMParameterName: !Ref ESSSMParameterName
+        EDHAdobeAnalyticsBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHAdobleAnalyticsBucketName
+        EDHBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHS3BucketName
+        S3EDHSSMBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHS3EDHSSMBucketName
+        ImageId: !Ref 'EDHINFImageId'
+        EDHSecurityGroups: !Join 
+          - ','
+          - - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-MGMEM7SecurityGroupID'
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-DPMSSSecurityGroupID' 
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-LinuxSecurityGroupID'                
+        EDHRootVolumeSize: 128
+        EDHRootVolumeType: gp2
+        EDHAttachedVolume1Size: 500
+        EDHAttachedVolume1Type: gp2
+        EDHAttachedVolume2Size: 1600
+        EDHAttachedVolume2Type: st1
+        Env: !Ref 'Env'
+        Application: !Ref Application
+        EDHTCOTagKey: !Ref EDHTCOTagKey
+        EDHTCOTagValue: !Ref EDHTCOTagValue            
+  EDHRedshiftStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateRedshiftStack 
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-RedShift-Cluster.yaml'
+      Parameters:
+        VPC: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'
+        SubnetID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet8'
+        RedshiftClusterType: 'multi-node' 
+        RedshiftNumberOfNodes: !Ref 'RedshiftNumberOfNodes'
+        RedshiftNodeType: !Ref 'RedshiftNodeType'
+        RedshiftMasterUsername: !Ref 'RedshiftMasterUsername'
+        EDHRedshiftUserPasswordPSName: !Ref 'EDHRedshiftUserPasswordPSName'
+        EDHRedshiftUserPasswordPSNameVersion: 1
+        RedshiftClusterName: !Ref 'RedshiftClusterName'
+        RedshiftSnapshotRetentionPeriod: !Ref 'RedshiftSnapshotRetentionPeriod'
+        RedshiftMaintenanceWindow: !Ref 'RedshiftMaintenanceWindow'
+        EDHRedshiftPublicAccess: 'false'
+        EDHBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHS3BucketName   
+        EDHRedshiftEncryptCluster: 'true'   
+        EDHRedshiftPort: '5439'
+        EDHTABSubnetCIDR:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet9Cidr'          
+        EDHINFSubnetCIDR:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet5Cidr'          
+        EDHEMRSubnetCIDR:    
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet1Cidr'          
+        Env: !Ref 'Env'
+        Application: !Ref Application
+        EDHTCOTagKey: !Ref EDHTCOTagKey
+        EDHTCOTagValue: !Ref EDHTCOTagValue                   
+  EDHMySQLEMRStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateMySQLEMRStack
+    DependsOn: 
+      - EDHESS3BucketStack        
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-MySQL-EMR-Cluster.yaml'
+      Parameters:                            
+        VPC: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'           
+        EMRSubnetID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet1' 
+        EMRClusterName: !Ref 'EMRClusterName'
+        KeyName: !Ref 'KeyName'
+        S3EDHScriptsBucketName: !Ref S3EDHEMRScriptsBucketName
+        EDHEMRMasterInstanceType: !Ref 'EMRMasterInstanceType'
+        EDHEMRCoreInstanceType: !Ref 'EMRCoreInstanceType'
+        EDHEMRCoreInstanceCount: !Ref 'EMRNumberOfCoreInstances'
+        EBSRootVolumeSize: !Ref 'EMREBSRootVolumeSize'  
+        EMRReleaseLabelVersion: !Ref 'EMRReleaseLabel'
+        EMRBootStrapAction: !Ref EMRBootStrapAction
+        EMRTLSCertificateobjectUrl: !Ref EMRTLSCertificateobjectUrl
+        LogUriS3Path: !Sub 's3://aws-logs-${AWS::AccountId}-us-east-1/elasticmapreduce/'
+        Terminationprotected: True
+        EMRAutoscalingGroupMaxCapacity: '6'
+        EMRAutoscalingGroupMinCapacity: '6'
+        VisibleToAllUsers: True   
+        Env: !Ref 'Env'
+        Application: !Ref Application
+        EDHTCOTagKey: !Ref EDHTCOTagKey
+        EDHTCOTagValue: !Ref EDHTCOTagValue        
+        EDHEMRMasterRootSize: 256
+        EDHEMRMasterRootVolumeType: gp2
+        EDHEMRMasterInstanceRootVolumeCount: 1
+        EDHEMRMasterVolume1Size: 100
+        EDHEMRMaterVolume1Type: gp2
+        EDHEMRMasterInstanceVolume1Count: 1
+        EDHEMRMasterInstanceCount: 1
+        EDHEMRCoreRootVolumeSize: 2000
+        EDHEMRCoreRootVolumeType: gp2
+        EDHEMRCoreInstanceRootVolumeCount: 1
+        EDHEMRCoreVolume1Size: 100
+        EDHEMRCoreVolume1Type: gp2
+        EDHEMRCoreInstanceVolume1Count: 1   
+        EDHEMRUserAccounts: !Ref EDHUsersList
+        RDSOracleDBEndpointAddress: !GetAtt EDHRDSOracleDBStack.Outputs.OracleEndpointAddress 
+        S3EDHMessageErrorBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingErrorBucketName
+        S3EDHMessageRAWBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRAWBucketName                       
+        S3EDHMessageRefinedBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRefinedBucketName
+        S3EDHMessagingRepositoryBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRepositoryBucketName
+        S3EDHTricklepollRawBucketName: !GetAtt EDHESS3BucketStack.Outputs.EDHTricklepollRawBucketName 
+        RDSSubnetId: !Join 
+          - ','
+          - - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet3'
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet4' 
+        RDSMySQLEngine: 'MySQL'
+        RDSMySQLEngineVersion: !Ref 'RDSMySQLEngineVersion'
+        RDSMySQLDBInstanceIdentifier: !Ref 'RDSMySQLDBInstanceIdentifier'
+        RDSMySQLDBInstanceClass: !Ref 'RDSMySQLDBInstanceClass'
+        RDSMySQLStorageType: 'gp2'
+        RDSMySQLAllocatedStorage: !Ref 'RDSMySQLAllocatedStorage'
+        RDSMySQLOptionGroupName: default:mysql-5-7
+        RDSMySQLDBName: !Ref RDSMySQLDBName
+        RDSMySQLMasterUsername: !Ref 'RDSMySQLMasterUsername'  
+        EDHMySQLRDSUserPasswordPSName: !Ref 'EDHMySQLRDSUserPasswordPSName'
+        EDHMySQLRDSUserPasswordPSNameVersion: 1
+        RDSMySQLStorageEncrypted: 'true'
+        RDSMySQLMultiAZ: !Ref RDSMySQLMultiAZ 
+        RDSPreferredMaintenanceWindow: !Ref RDSMySQLPreferredMaintenanceWindow 
+        RDSPreferredBackupWindow: !Ref RDSMySQLPreferredBackupWindow
+        RDSBackupRetentionPeriod: !Ref RDSMySQLBackupRetentionPeriod     
+        EDHEMRSubnetCIDR: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet1Cidr'                      
+Outputs:      
+  EnvironmentName:
+    Description: Environment
+    Value: !Ref Env
+    Export:
+      Name: !Sub '${AWS::StackName}-Environment' 
+  ApplicationName:
+    Description: Application
+    Value: !Ref Application
+    Export:
+      Name: !Sub '${AWS::StackName}-Application'
+  KeyPairName:
+    Description: KeyPair Name  
+    Value: !Ref KeyName
+    Export:
+      Name: !Sub '${AWS::StackName}-KeyName'  
+  EDHTCOTagKeyName:
+    Description: EDH Tag Key
+    Value: !Ref EDHTCOTagKey
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHTCOTagKey'
+  EDHTCOTagvalue:
+    Description: EDH  Tag Value  
+    Value: !Ref EDHTCOTagValue
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHTCOTagValue'                    
+  EDHS3BucketName:
+    Description: The Name of EDH S3 Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHS3BucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHS3Bucket'       
+  EDHMessagingRAWBucketName:
+    Description: The Name of EDH RAW Messaging Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRAWBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHMessagingRAWBucket'     
+  EDHMessagingErrorBucketName:
+    Description: The Name of EDH Error Messaging Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingErrorBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHMessagingErrorBucket'     
+  EDHMessagingRefinedBucketName:
+    Description: The Name of EDH Redfined Messaging Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRefinedBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHMessagingRefinedBucket'     
+  EDHMessagingRepositoryBucketName:
+    Description: The Name of EDH Repository Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHMessagingRepositoryBucketName
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHMessagingRepositoryBucket'      
+  EDHTricklepollRawBucketName:
+    Description: The Name of EDH RAW Tricklepoll Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHTricklepollRawBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHTricklepollRawBucket'     
+  EDHS3EDHSSMBucketName:
+    Description: The Name of Bucket for SSM Document.
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHS3EDHSSMBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHS3EDHSSMBucket'     
+  EDHAdobleAnalyticsBucketName:
+    Description: Name of the Adobe Analytics Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHAdobleAnalyticsBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHAdobleAnalyticsBucket'     
+  EDHPkgBucketName:
+    Description: Name of the Package Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHPkgBucketName     
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHPkgBucket'          
+  EDHETLBucketName:
+    Description: Name of the ETL Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHETLBucketName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHETLBucket'     
+  EDHSASBackupBucketName:
+    Description: Name of the SAS Backup Bucket
+    Value: !GetAtt EDHESS3BucketStack.Outputs.EDHSASBackupBucketName   
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHSASBackupBucket' 
+  EDHECRKTAppRepository:
+    Condition: CreateECRStack
+    Description: ECR Korea Trade App Repository Information
+    Value: !GetAtt EDHECRStack.Outputs.EDHECRKTAppRepositoryName 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHECRKTAppRepository'
+  EDHECRKTWebRepository:
+    Condition: CreateECRStack
+    Description: ECR Korea Trade Web Repository Information
+    Value: !GetAtt EDHECRStack.Outputs.EDHECRKTWebRepositoryName  
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHECRKTWebRepository'
+  EDHECRPOSRepository:
+    Condition: CreateECRStack
+    Description: ECR POS Repository Information
+    Value: !GetAtt EDHECRStack.Outputs.EDHECRPOSRepositoryName            
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHECRPOSRepository' 
+  MySQLJDBCConnectionStringURL:
+    Condition: CreateMySQLEMRStack
+    Description: JDBC connection string for MySQL database
+    Value: !GetAtt EDHMySQLEMRStack.Outputs.MySQLJDBCConnectionString   
+    Export:
+      Name: !Sub '${AWS::StackName}-MySQLJDBCConnectionStringURL'
+  MySQLEndpointAddress:
+    Condition: CreateMySQLEMRStack
+    Description: MySQL RDS database Endpoint Address
+    Value: !GetAtt EDHMySQLEMRStack.Outputs.MySQLEndpointAddress   
+    Export:
+      Name: !Sub '${AWS::StackName}-MySQLEndpointAddress' 
+  RDSMySQLDBSecurityGroupsID:
+    Condition: CreateMySQLEMRStack
+    Description: MySQL RDS SecurityGroup ID    
+    Value: !GetAtt EDHMySQLEMRStack.Outputs.RDSMySQLDBSecurityGroupsID   
+    Export:
+      Name: !Sub '${AWS::StackName}-RDSMySQLDBSecurityGroupsID'           
+  OracleJDBCConnectionStringURL:
+    Description: JDBC connection string for Oracle database
+    Value: !GetAtt EDHRDSOracleDBStack.Outputs.OracleJDBCConnectionString   
+    Export:
+      Name: !Sub '${AWS::StackName}-OracleJDBCConnectionStringURL'
+  OracleEndpointAddress:
+    Description: Oracle database Endpoint Address
+    Value: !GetAtt EDHRDSOracleDBStack.Outputs.OracleEndpointAddress   
+    Export:
+      Name: !Sub '${AWS::StackName}-OracleEndpointAddress'  
+  RDSOracleDBSecurityGroupsID:
+    Description: Oracle RDS SecurityGroup ID    
+    Value: !GetAtt EDHRDSOracleDBStack.Outputs.RDSOracleDBSecurityGroupsID   
+    Export:
+      Name: !Sub '${AWS::StackName}-RDSOracleDBSecurityGroupsID'             
+  RedshiftClusterEndpoint:
+    Condition: CreateRedshiftStack
+    Description: Redshift Cluster endpoint
+    Value: !GetAtt EDHRedshiftStack.Outputs.RedshiftClusterEndpoint   
+    Export:
+      Name: !Sub '${AWS::StackName}-RedshiftClusterEndpoint'
+  RedshiftSecurityGroupID:
+    Condition: CreateRedshiftStack
+    Description: Redshift Security Group ID
+    Value: !GetAtt EDHRedshiftStack.Outputs.RedshiftSecurityGroupID
+    Export:
+      Name: !Sub '${AWS::StackName}-RedshiftSecurityGroupID'         
+  EDHServerID:
+    Condition: CreateINFBDMS3Stack 
+    Value: !GetAtt EDHINFBDMStack.Outputs.EDHServerID
+    Description: Informatica BDM Instance Id
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHServerID'    
+  EDHServerPrivateIP:
+    Condition: CreateINFBDMS3Stack 
+    Value: !GetAtt EDHINFBDMStack.Outputs.EDHServerPrivateIP
+    Description: Informatica BDM Instance Private IP  
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHServerPrivateIP'      
+  EDHEBSVolume1ID:
+    Condition: CreateINFBDMS3Stack 
+    Value: !GetAtt EDHINFBDMStack.Outputs.EDHEBSVolume1ID
+    Description: Informatica BDM VolumeId
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHEBSVolume1ID'    
+  EDHEBSVolume2ID:
+    Condition: CreateINFBDMS3Stack 
+    Value: !GetAtt EDHINFBDMStack.Outputs.EDHEBSVolume2ID
+    Description: Informatica BDM VolumeId      
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHEBSVolume2ID'  
+  ESSSMParameterName:
+    Value: !Ref ESSSMParameterName
+    Description: SSM Parameters Store Name     
+    Export:
+      Name: !Sub '${AWS::StackName}-ESSSMParameterStoreName'       
+  RedshiftMasterUsername:
+    Value: !Ref RedshiftMasterUsername
+    Description: Redshift Master User Name    
+    Export:
+      Name: !Sub '${AWS::StackName}-RedshiftMasterUsername' 
+  EDHRedshiftUserPasswordPSName:
+    Value: !Ref EDHRedshiftUserPasswordPSName
+    Description: Redshift Password Parameter Store name   
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHRedshiftUserPasswordPSName' 
+  RDSOracleDBName:
+    Value: !Ref RDSOracleDBName
+    Description: Oracle RDS Database Name    
+    Export:
+      Name: !Sub '${AWS::StackName}-RDSOracleDBName' 
+  RDSOracleMasterUsername:
+    Value: !Ref RDSOracleMasterUsername
+    Description: Oracle RDS Database Master User Name    
+    Export:
+      Name: !Sub '${AWS::StackName}-RDSOracleMasterUsername'    
+  EDHOracleRDUserPasswordPSName:    
+    Value: !Ref EDHOracleRDUserPasswordPSName
+    Description: Oracle RDS Database Password Parameter Store Name    
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHOracleRDUserPasswordPSName'   
+  EDHINFBDMSecurityGroupID:
+    Description: VPC Security Group for EDH BDM Server.
+    Condition: CreateINFBDMS3Stack 
+    Value: !GetAtt EDHINFBDMStack.Outputs.EDHINFBDMSecurityGroupID 
+    Export:
+      Name: !Sub '${AWS::StackName}-EDHINFBDMSecurityGroupID'                                       

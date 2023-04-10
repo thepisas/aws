@@ -1,0 +1,226 @@
+[
+  {
+    "ParameterKey": "Application",
+    "ParameterValue": "EDH"
+  },
+  {
+    "ParameterKey": "KeyName",
+    "ParameterValue": "TCO-STG"
+  },
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "STG"
+  },
+  {
+    "ParameterKey": "ECRStack",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "INFBDMS3Stack",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "RedshiftStack",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "MySQLEMRStack",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "EDHINFInstanceType",
+    "ParameterValue": "m4.large"
+  },
+  {
+    "ParameterKey": "EDHUsersList",
+    "ParameterValue": "adatta,csett,skarmaka,droglier,nirchoud,mkundu,negupta,rprakash,sbanerje,vreddy,tsurekha,sbhooshi,sbhooshi,pujeyara,smuthusa,lsahoo,speddapa,rgalanna,mcuser"
+  },
+  {
+    "ParameterKey": "EDHINFServerName",
+    "ParameterValue": "AMZLINEDHS01"
+  },  
+  {
+    "ParameterKey": "EDHINFImageId",
+    "ParameterValue": "ami-b63769a1"
+  },
+  {
+    "ParameterKey": "ESSSMParameterName",
+    "ParameterValue": "agent-config-linux"
+  },
+  {
+    "ParameterKey": "RDSOracleEngineVersion",
+    "ParameterValue": "12.1.0.2.v6"
+  },
+  {
+    "ParameterKey": "RDSOracleDBInstanceIdentifier",
+    "ParameterValue": "amzdbedhs01"
+  },
+  {
+    "ParameterKey": "RDSOracleDBInstanceClass",
+    "ParameterValue": "db.m4.large"
+  },
+  {
+    "ParameterKey": "RDSOracleAllocatedStorage",
+    "ParameterValue": "50"
+  },
+  {
+    "ParameterKey": "RDSOracleLicenseModel",
+    "ParameterValue": "license-included"
+  },
+  {
+    "ParameterKey": "RDSOracleDBName",
+    "ParameterValue": "ORACL1"
+  },
+  {
+    "ParameterKey": "RDSOracleMultiAZ",
+    "ParameterValue": "true"
+  },  
+  {
+    "ParameterKey": "RDSOracleMasterUsername",
+    "ParameterValue": "oracle"
+  },
+  {
+    "ParameterKey": "EDHOracleRDUserPasswordPSName",
+    "ParameterValue": "RDS_Oracle_MasterUserPassword_Stg"
+  },
+  {
+    "ParameterKey": "RDSOraclePreferredMaintenanceWindow",
+    "ParameterValue": "sun:07:00-sun:08:00"
+  },
+  {
+    "ParameterKey": "RDSOraclePreferredBackupWindow",
+    "ParameterValue": "04:00-05:00"
+  },
+  {
+    "ParameterKey": "RDSOracleBackupRetentionPeriod",
+    "ParameterValue": "20"
+  },       
+  {
+    "ParameterKey": "RDSMySQLDBInstanceClass",
+    "ParameterValue": "db.r5.large"
+  },
+  {
+    "ParameterKey": "RDSMySQLDBInstanceIdentifier",
+    "ParameterValue": "amzdbedhs02"
+  },       
+  {
+    "ParameterKey": "RDSMySQLEngineVersion",
+    "ParameterValue": "5.7.16"
+  },
+  {
+    "ParameterKey": "RDSMySQLAllocatedStorage",
+    "ParameterValue": "50"
+  },       
+  {
+    "ParameterKey": "RDSMySQLMasterUsername",
+    "ParameterValue": "hive"
+  },
+  {
+    "ParameterKey": "EDHMySQLRDSUserPasswordPSName",
+    "ParameterValue": "RDS_MySQL_MasterUserPassword_Stg"
+  },   
+  {
+    "ParameterKey": "RDSMySQLDBName",
+    "ParameterValue": "hive"
+  },
+  {
+    "ParameterKey": "RDSMySQLMultiAZ",
+    "ParameterValue": "true"
+  },  
+  {
+    "ParameterKey": "RDSMySQLBackupRetentionPeriod",
+    "ParameterValue": "20"
+  },    
+  {
+    "ParameterKey": "RDSMySQLPreferredBackupWindow",
+    "ParameterValue": "04:54-05:24"
+  },
+  {
+    "ParameterKey": "RDSMySQLPreferredMaintenanceWindow",
+    "ParameterValue": "thu:04:12-thu:04:42"
+  },    
+  {
+    "ParameterKey": "EMRClusterName",
+    "ParameterValue": "AMZEMREDHS01"
+  },
+  {
+    "ParameterKey": "EMRMasterInstanceType",
+    "ParameterValue": "m4.large"
+  },    
+  {
+    "ParameterKey": "EMRCoreInstanceType",
+    "ParameterValue": "m4.xlarge"
+  },
+  {
+    "ParameterKey": "EMRNumberOfCoreInstances",
+    "ParameterValue": "3"
+  },    
+  {
+    "ParameterKey": "EMREBSRootVolumeSize",
+    "ParameterValue": "100"
+  },
+  {
+    "ParameterKey": "EMRReleaseLabel",
+    "ParameterValue": "emr-5.0.0"
+  }, 
+  {
+    "ParameterKey": "EMRTLSCertificateobjectUrl",
+    "ParameterValue": "s3://amzs3pkgemrscriptsstg/certs/ProdEMRCert_Exp03172020.zip"
+  }, 
+  {
+    "ParameterKey": "EMRBootStrapAction",
+    "ParameterValue": "s3://tiffany-edh-environment-build-prerequisites/cloudformation/scripts/bootstrap-qa.sh"
+  },          
+  {
+    "ParameterKey": "S3EDHEMRScriptsBucketName",
+    "ParameterValue": "amzs3pkgemrscriptsstg"
+  },  
+  {
+    "ParameterKey": "RedshiftNumberOfNodes",
+    "ParameterValue": "3"
+  },    
+  {
+    "ParameterKey": "RedshiftNodeType",
+    "ParameterValue": "dc2.large"
+  },
+  {
+    "ParameterKey": "RedshiftMasterUsername",
+    "ParameterValue": "master"
+  },    
+  {
+    "ParameterKey": "EDHRedshiftUserPasswordPSName",
+    "ParameterValue": "Redshift_MasterUserPassword_Stg"
+  },    
+  {
+    "ParameterKey": "RedshiftClusterName",
+    "ParameterValue": "amzlrsedhs01"
+  },    
+  {
+    "ParameterKey": "RedshiftSnapshotRetentionPeriod",
+    "ParameterValue": "20"
+  },    
+  {
+    "ParameterKey": "RedshiftMaintenanceWindow",
+    "ParameterValue": "sun:07:00-sun:08:00"
+  },    
+  {
+    "ParameterKey": "CFTS3BucketName",
+    "ParameterValue": "tiffany-edh-environment-build-prerequisites"
+  },    
+  {
+    "ParameterKey": "CFTS3KeyPrefix",
+    "ParameterValue": "cloudformation/TiffanyEDH-Nested-1"
+  },
+  {
+    "ParameterKey": "EDHTCOTagKey",
+    "ParameterValue": "Vendor"
+  },
+  {
+    "ParameterKey": "EDHTCOTagValue",
+    "ParameterValue": "MontyCloud"
+  },   
+  {
+    "ParameterKey": "EDHTCOVPCMasterStack",
+    "ParameterValue": "TiffanyEDHStg"
+  }   
+]

@@ -1,0 +1,122 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to create the requrired ECR Repository to add Conatainer Images for the ECS Cluster Application deployment.
+Parameters:    
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - prod
+      - test
+      - stg
+      - dev
+      - qa
+    Default: test
+Resources:
+  SVCECRPUSHKTUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub svc_ecr_push_kt${Env}
+      LoginProfile:
+        Password: Temp!111
+        PasswordResetRequired: true  
+  SVCECRPUSHPOSUser:
+    Type: AWS::IAM::User
+    Properties:
+      UserName: !Sub svc_ecr_push_pos_${Env}
+      LoginProfile:
+        Password: Temp!111
+        PasswordResetRequired: true  
+  SVCECRPolicies:
+    Type: 'AWS::IAM::Policy'   
+    Properties:
+      PolicyName: "CFNUsers"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+         - Effect: Allow
+           Action: 'ecr:GetAuthorizationToken'
+           Resource: '*'
+      Users: 
+        - !Ref "SVCECRPUSHKTUser"
+        - !Ref "SVCECRPUSHPOSUser"                  
+  EDHECRKTAppRepository: 
+    Type: AWS::ECR::Repository
+    DependsOn:
+      - SVCECRPUSHKTUser
+    Properties: 
+      RepositoryName: !Sub koreatrade_${Env}_app
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement:
+          - Sid: koreatradeApp
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/svc_ecr_push_kt${Env}'
+            Action:
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:BatchGetImage'
+              - 'ecr:CompleteLayerUpload'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:InitiateLayerUpload'
+              - 'ecr:PutImage'
+              - 'ecr:UploadLayerPart'
+  EDHECRKTWebRepository: 
+    Type: AWS::ECR::Repository
+    DependsOn:
+      - SVCECRPUSHPOSUser    
+    Properties: 
+      RepositoryName: !Sub koreatrade_${Env}_web
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement:
+          - Sid: koreatradeWeb
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/svc_ecr_push_kt${Env}'
+            Action:
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:BatchGetImage'
+              - 'ecr:CompleteLayerUpload'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:InitiateLayerUpload'
+              - 'ecr:PutImage'
+              - 'ecr:UploadLayerPart'
+  EDHECRPOSRepository: 
+    Type: AWS::ECR::Repository
+    DependsOn:
+      - SVCECRPUSHKTUser    
+    Properties: 
+      RepositoryName: !Sub amzecsrf${Env}
+      RepositoryPolicyText: 
+        Version: "2012-10-17"
+        Statement:
+          - Sid: POSECRrepo
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:user/svc_ecr_push_pos_${Env}'
+            Action:
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:BatchGetImage'
+              - 'ecr:CompleteLayerUpload'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:InitiateLayerUpload'
+              - 'ecr:PutImage'
+              - 'ecr:UploadLayerPart' 
+Outputs:
+  SVCECRPUSHPOSUserName:
+    Description: POS User Name
+    Value: !Ref SVCECRPUSHPOSUser
+  SVCECRPUSHKTUser:
+    Description: POS User Name
+    Value: !Ref SVCECRPUSHKTUser    
+  EDHECRKTAppRepositoryName:
+    Description: ECR Repository Information
+    Value: !Ref EDHECRKTAppRepository
+  EDHECRKTWebRepositoryName:
+    Description: ECR Repository Information
+    Value: !Ref EDHECRKTWebRepository 
+  EDHECRPOSRepositoryName:
+    Description: ECR Repository Information
+    Value: !Ref EDHECRPOSRepository                                               

@@ -1,0 +1,280 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Deploy a Lambda custom resource for encrypting the Plain Text value.
+Parameters:
+  ELSPassParameterstoreName:
+    Type: AWS::SSM::Parameter::Name
+    Description: LambdaFunction Encryption Password
+  EDHSSMParameterStoreName:
+    Type: String
+    Description: Name for the Parameter Store to save the encrypted password. 
+    Default: ELSLambdaEncryptedPassword 
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG   
+  EDHLambdaKMSKey:
+    Type: String
+    Description: KMS Key for Password Encryption
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH   
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value          
+Resources:  
+  EncryptionLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'              
+      Policies:
+        - PolicyName: CloudFormationRead
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: KMSSSMPermissions
+              Effect: Allow
+              Action:
+                - 'kms:*'
+                - 'ssm:*'
+                - 'events:*'
+              Resource: '*'                
+            - Sid: AWSCloudwatchLogs
+              Effect: Allow
+              Action:
+                - 'logs:CreateLogGroup'
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+              Resource: '*'
+            - Sid: KMSDecryptPermissions
+              Effect: Allow
+              Action:
+                - 'kms:Decrypt'
+              Resource: "*"
+            - Sid: LambdaInvokePermissions
+              Action:
+                - 'lambda:InvokeFunction'
+              Effect: Allow
+              Resource: '*'
+            - Sid: CloudwatchMetricAccess
+              Action:
+                - 'cloudwatch:PutMetricData'
+              Effect: Allow
+              Resource: '*'
+      RoleName: !Sub "ES-Encryption-LAMBDA-Role"
+      Path: /        
+  ELSEncryptionLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:       
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import base64
+          import os
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def Load_ParameterStore(session):
+
+            try:
+              ssm_client = session.client('ssm')
+              response = ssm_client.get_parameter(
+                  Name=os.environ['Get_ParameterStore_Name']
+              )
+              value=response['Parameter']['Value']
+              return value
+            except Exception as ex:
+              logger.info('Something went wrong: ' +str(ex))
+
+          def Encrypt(session):
+            try: 
+              kms_client = session.client('kms')
+              key_id = os.environ['KMS_ID']
+              plaintext = Load_ParameterStore(session)
+              stuff = kms_client.encrypt(KeyId=key_id, Plaintext=plaintext)
+              binary_encrypted = stuff[u'CiphertextBlob']
+              encrypted_password = base64.b64encode(binary_encrypted)
+              password = encrypted_password.decode()
+              return password
+            except Exception as ex:
+              logger.info('Something went wrong: ' +str(ex))  
+
+          def AddPassword_ParameterStore(session):
+
+            try:
+              ssm_client = session.client('ssm')
+              password=Encrypt(session)
+              response = ssm_client.put_parameter(
+                  Name=os.environ['ParameterStore_Name'],
+                  Description='ElasticSearch Encrypted User Password',
+                  Value=password,
+                  Type='String',
+                  Overwrite=True,
+              )
+            except Exception as ex:
+              logger.info('Something went wrong: ' +str(ex))
+
+          def disable_rule(session):
+              event_client = session.client('events')
+              event_client.disable_rule(
+                Name='edh-els-encrypt-password'
+              ) 
+          def lambda_handler(event, context):
+            session = boto3.Session()
+            Load_ParameterStore(session)
+            print("Retrive Password from parameter store")
+            Encrypt(session)
+            print("Password Encryption Initiated for ElasticSearch user Password")
+            AddPassword_ParameterStore(session)
+            print("Created Paremeter Store and Added the Encrypted password")
+            disable_rule(session)
+      Description: 'Lambda Function to Encrypt User Password'
+      FunctionName: "edh-elasticsearch-password-encryption"
+      Handler: 'index.lambda_handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: EncryptionLambdaRole.Arn
+      Runtime: python2.7
+      Timeout: 300
+      Environment:
+        Variables:
+          Get_ParameterStore_Name: !Ref ELSPassParameterstoreName
+          KMS_ID: !Ref EDHLambdaKMSKey
+          ParameterStore_Name: !Ref EDHSSMParameterStoreName
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud 
+  ELSEncryptionScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "ELS Password Encryption ScheduledRule"
+      ScheduleExpression: cron(0/2 * * * ? *)
+      Name: edh-els-encrypt-password
+      State: ENABLED
+      Targets: 
+        - Arn: !GetAtt ELSEncryptionLambdaFunction.Arn
+          Id: "ELSEncryptionLambdaFunction"          
+  ELSEncryptionLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      FunctionName: !Ref ELSEncryptionLambdaFunction
+      SourceArn: !GetAtt ELSEncryptionScheduledRule.Arn        
+  CleanUpLambdaFunctionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AWSLambdaFullAccess'
+        - 'arn:aws:iam::aws:policy/IAMFullAccess'
+        - 'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+      Path: /  
+      RoleName: 'CleanUpLambdaFunctionRole' 
+  CleanUpPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: CleanUpPolicy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 
+              - 'cloudformation:*'
+              - 'events:*'
+            Resource: '*'                           
+      Roles:
+        - !Ref CleanUpLambdaFunctionRole                       
+  CleanUpScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: 'ScheduledRule'
+      ScheduleExpression: cron(0/20 * * * ? *)
+      State: ENABLED
+      Targets: 
+        - Id: TaskScheduler
+          Arn: !GetAtt
+            - CleanUpLambdaFunction
+            - Arn
+  CleanUpInvokeLambda: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref CleanUpLambdaFunction
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: 
+        Fn::GetAtt: 
+          - 'CleanUpScheduledRule'
+          - 'Arn'  
+  CleanUpLambdaFunction:
+    Type: 'AWS::Lambda::Function'
+    Properties:
+      FunctionName: 'CleanUpLambdaFunction'
+      Handler: 'index.lambda_handler'
+      Role: !GetAtt
+            - CleanUpLambdaFunctionRole
+            - Arn
+      Code:
+        ZipFile: |
+          import json
+          import boto3
+          import os
+          import logging
+
+          logger = logging.getLogger()
+          logger.setLevel(logging.INFO)
+
+          def lambda_handler(event, context):
+              # TODO implement
+              try:
+               client = boto3.client('cloudformation')
+               stacknames=[os.environ['CleanUpStackName']]
+               for stackname in stacknames:
+                 response = client.delete_stack(StackName=stackname)
+                 logger.info("The Stack "+ str(stackname)+" was Successfully Deleted ")  
+               return     
+              except Exception as ex:
+                  logger.info('Something went wrong: ' +str(ex))
+      Runtime: python2.7
+      Description: 'Lambda Function cleanup temporary resources'
+      MemorySize: 256
+      Timeout: 120 
+      Environment:
+        Variables:
+          CleanUpStackName: !Ref 'AWS::StackName' 
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud                               

@@ -1,0 +1,714 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation template to create the required S3 buckets associated with the EDH infrastructure build.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Configuration
+        Parameters:
+          - Env
+          - Application
+      - Label:
+          default: Endpoint Configuration
+        Parameters:
+          - EDHS3EndpointID
+      - Label:
+          default: S3 Bucket Information
+        Parameters:
+          - S3EDHMessageRAWBucketName
+          - S3EDHMessageErrorBucketName
+          - S3EDHMessageRefinedBucketName
+          - S3EDHMessagingRepositoryBucketName
+          - S3EDHTricklepollRawBucketName
+          - S3EDHSSMBucketName
+          - EDHBucketName
+          - S3EDHAdobleAnalyticsBucketName
+          - S3EDHPkgBucketName
+          - S3EDHETLBucketName
+          - S3EDHSASBackupBucketName
+      - Label:
+          default: Tagging Configuration
+        Parameters:
+          - EDHTCOTagKey
+          - EDHTCOTagValue            
+Parameters:
+  S3EDHMessageRAWBucketName:
+    Type: String
+    Description: Name of the bucket to store the RAW Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrawtest
+  S3EDHMessageErrorBucketName:
+    Type: String
+    Description: Name of the bucket to store the error Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingerrortest
+  S3EDHMessageRefinedBucketName:
+    Type: String
+    Description: Name of the bucket to store the Redfined Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrefinedtest
+  S3EDHMessagingRepositoryBucketName:
+    Type: String
+    Description: Name of the bucket for elasticsearch respository
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingesrepositorytest
+  S3EDHTricklepollRawBucketName:
+    Type: String
+    Description: Name of the bucket to store tricklepoll raw dats
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhtricklepollrawtest
+  S3EDHSSMBucketName:
+    Type: String
+    Description: Name of the bucket to Store SSM Parameters
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3testssm
+  EDHBucketName:
+    Type: String
+    Description: Name of the EDH Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhtest
+  S3EDHAdobleAnalyticsBucketName:
+    Type: String
+    Description: Name of the Adobe Analytics Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3adobeanalytictest
+  S3EDHPkgBucketName:
+    Type: String
+    Description: Name of the Package Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhpkgtest
+  S3EDHETLBucketName:
+    Type: String
+    Description: Name of the ETL Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3etlteststage
+  S3EDHSASBackupBucketName:
+    Type: String
+    Description: Name of the SAS Backup Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3sasbackuptest
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG 
+  EDHS3EndpointID:
+    Type: String
+    Description: S3 Endpoint ID for Bucket Access
+    AllowedPattern: 'vpce-[a-z0-9A-Z]*'
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value 
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH           
+Resources:
+  EDHS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref EDHBucketName
+      AccessControl: LogDeliveryWrite
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHS3Bucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: List permissions for cross account access
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            Action: 's3:*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHBucketName}'
+              - !Sub 'arn:aws:s3:::${EDHBucketName}/*'
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHBucketName}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHBucketName}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHBucketName}'
+              - !Sub 'arn:aws:s3:::${EDHBucketName}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHMessagingRAWBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHMessageRAWBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHMessagingRAWBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHMessagingRAWBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingRAWBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingRAWBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHMessagingRAWBucket}'
+              - !Sub 'arn:aws:s3:::${EDHMessagingRAWBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHMessagingErrorBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHMessageErrorBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHMessagingErrorBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHMessagingErrorBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingErrorBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingErrorBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHMessagingErrorBucket}'
+              - !Sub 'arn:aws:s3:::${EDHMessagingErrorBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHMessagingRefinedBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHMessageRefinedBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHMessagingRefinedBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHMessagingRefinedBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingRefinedBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingRefinedBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHMessagingRefinedBucket}'
+              - !Sub 'arn:aws:s3:::${EDHMessagingRefinedBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHMessagingRepositoryBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHMessagingRepositoryBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHMessagingRepositoryBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHMessagingRepositoryBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingRepositoryBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHMessagingRepositoryBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHMessagingRepositoryBucket}'
+              - !Sub 'arn:aws:s3:::${EDHMessagingRepositoryBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHTricklepollRawBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHTricklepollRawBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHTricklepollRawBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHTricklepollRawBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHTricklepollRawBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHTricklepollRawBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHTricklepollRawBucket}'
+              - !Sub 'arn:aws:s3:::${EDHTricklepollRawBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  S3EDHSSMBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHSSMBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  S3EDHSSMBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3EDHSSMBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${S3EDHSSMBucket}'
+              - !Sub 'arn:aws:s3:::${S3EDHSSMBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHAdobleAnalyticsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHAdobleAnalyticsBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue       
+  EDHPkgBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHPkgBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue       
+  EDHETLBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHETLBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHETLBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHETLBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHETLBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHETLBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHETLBucket}'
+              - !Sub 'arn:aws:s3:::${EDHETLBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+  EDHSASBackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: LogDeliveryWrite
+      BucketName: !Ref S3EDHSASBackupBucketName
+      LifecycleConfiguration:
+        Rules:
+        - AbortIncompleteMultipartUpload:
+            DaysAfterInitiation: 7
+          ExpirationInDays: 366
+          Id: delete_old_versions
+          Status: Enabled
+      Tags:
+        - Key: Vendor
+          Value: MontyCloud
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHSASBackupBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref EDHSASBackupBucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: DenyIncorrectEncryptionHeader
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHSASBackupBucket}/*'
+            Condition:
+              StringNotEquals:
+                's3:x-amz-server-side-encryption': AES256
+          - Sid: DenyUnEncryptedObjectUploads
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:PutObject'
+            Resource: !Sub 'arn:aws:s3:::${EDHSASBackupBucket}/*'
+            Condition:
+              'Null':
+                's3:x-amz-server-side-encryption': 'true'
+          - Sid: Access-to-specific-VPCE-only
+            Effect: Deny
+            Principal: '*'
+            Action:
+              - 's3:GetObject*'
+              - 's3:PutObject*'
+              - 's3:DeleteObject*'
+            Resource:
+              - !Sub 'arn:aws:s3:::${EDHSASBackupBucket}'
+              - !Sub 'arn:aws:s3:::${EDHSASBackupBucket}/*'
+            Condition:
+              StringNotEquals:
+                'aws:sourceVpce':
+                  - !Ref EDHS3EndpointID
+Outputs:
+  EDHS3BucketName:
+    Description: The Name of EDH S3 Bucket
+    Value: !Ref EDHS3Bucket    
+  EDHMessagingRAWBucketName:
+    Description: The Name of EDH RAW Messaging Bucket
+    Value: !Ref EDHMessagingRAWBucket
+  EDHMessagingErrorBucketName:
+    Description: The Name of EDH Error Messaging Bucket
+    Value: !Ref EDHMessagingErrorBucket
+  EDHMessagingRefinedBucketName:
+    Description: The Name of EDH Redfined Messaging Bucket
+    Value: !Ref EDHMessagingRefinedBucket
+  EDHMessagingRepositoryBucketName:
+    Description: The Name of EDH Repository Bucket
+    Value: !Ref EDHMessagingRepositoryBucket
+  EDHTricklepollRawBucketName:
+    Description: The Name of EDH RAW Tricklepoll Bucket
+    Value: !Ref EDHTricklepollRawBucket
+  EDHS3EDHSSMBucketName:
+    Description: The Name of Bucket for SSM Document.
+    Value: !Ref S3EDHSSMBucket
+  EDHMessagingRAWBucketArn:
+    Description: The Arn of EDH RAW Messaging S3 Bucket
+    Value: !GetAtt EDHMessagingRAWBucket.Arn
+  EDHMessagingErrorBucketArn:
+    Description: The Arn of EDH Error Messaging S3 Bucket
+    Value: !GetAtt EDHMessagingErrorBucket.Arn
+  EDHMessagingRefinedBucketArn:
+    Description: The Arn of EDH Redfined Messaging S3 Bucket
+    Value: !GetAtt EDHMessagingRefinedBucket.Arn
+  EDHMessagingRepositoryBucketArn:
+    Description: The Arn of EDH Repository S3 Bucket
+    Value: !GetAtt EDHMessagingRepositoryBucket.Arn
+  EDHTricklepollRawBucketArn:
+    Description: The Arn of EDH RAW Tricklepoll S3 Bucket
+    Value: !GetAtt EDHTricklepollRawBucket.Arn
+  EDHS3EDHSSMBucketArn:
+    Description: The Arn of S3 Bucket for SSM Document.
+    Value: !GetAtt S3EDHSSMBucket.Arn
+  EDHAdobleAnalyticsBucketName:
+    Description: Name of the Adobe Analytics Bucket
+    Value: !Ref EDHAdobleAnalyticsBucket
+  EDHAdobleAnalyticsBucketNameARN:
+    Description: The Arn of Adobe Analytics Bucket
+    Value: !GetAtt EDHAdobleAnalyticsBucket.Arn
+  EDHPkgBucketName:
+    Description: Name of the Package Bucket
+    Value: !Ref EDHPkgBucket
+  EDHPkgBucketNameARN:
+    Description: The Arn of the Package Bucket
+    Value: !GetAtt EDHPkgBucket.Arn
+  EDHETLBucketName:
+    Description: Name of the ETL Bucket
+    Value: !Ref EDHETLBucket
+  EDHETLBucketNameARN:
+    Description: The Arn of the ETL Bucket
+    Value: !GetAtt EDHETLBucket.Arn
+  EDHSASBackupBucketName:
+    Description: Name of the SAS Backup Bucket
+    Value: !Ref EDHSASBackupBucket
+  EDHSASBackupBucketNameARN:
+    Description: The ARN of the SAS Backup Bucket
+    Value: !GetAtt EDHSASBackupBucket.Arn

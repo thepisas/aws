@@ -1,0 +1,134 @@
+[
+  {
+    "ParameterKey": "EDHPOSTaskDEF",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "EDHKTTaskDEF",
+    "ParameterValue": "Yes"
+  }, 
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "STG"
+  },
+  {
+    "ParameterKey": "ECSPOSDesiredCount",
+    "ParameterValue": "1"
+  },        
+  {
+    "ParameterKey": "ECSPOSContainerName",
+    "ParameterValue": "bucketstorageapi"
+  },
+  {
+    "ParameterKey": "ECSPOSImageTag",
+    "ParameterValue": "latest"
+  },
+  {
+    "ParameterKey": "ECSPOSContainerCpu",
+    "ParameterValue": "1024"
+  },
+  {
+    "ParameterKey": "ECSPOSContainerMemory",
+    "ParameterValue": "512"
+  }, 
+  {
+    "ParameterKey": "ECSPOSContainerPortNumber",
+    "ParameterValue": "5000"
+  },
+  {
+    "ParameterKey": "ECSPOSContainerHostPort",
+    "ParameterValue": "0"
+  },
+  {
+    "ParameterKey": "ECSKTWEBContainerName",
+    "ParameterValue": "ktstg-web"
+  },
+  {
+    "ParameterKey": "ECSKTWEBImageTag",
+    "ParameterValue": "latest"
+  },
+  {
+    "ParameterKey": "ECSKTWEBMemoryReservation",
+    "ParameterValue": "256"
+  },   
+  {
+    "ParameterKey": "ECSKTWEBContainerPortNumber",
+    "ParameterValue": "80"
+  },           
+  {
+    "ParameterKey": "ECSKTWEBContainerHostPort",
+    "ParameterValue": "0"
+  },
+  {
+    "ParameterKey": "ECSKTWEBDesiredCount",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSKTAPPImageTag",
+    "ParameterValue": "latest"
+  },  
+  {
+    "ParameterKey": "ECSKTAPPContainerName",
+    "ParameterValue": "ktstg-app"
+  },
+  {
+    "ParameterKey": "ECSKTAPPMemoryReservation",
+    "ParameterValue": "256"
+  },
+  {
+    "ParameterKey": "ECSKTAPPContainerPortNumber",
+    "ParameterValue": "90"
+  },  
+  {
+    "ParameterKey": "ECSKTAPPContainerHostPort",
+    "ParameterValue": "0"
+  },  
+  {
+    "ParameterKey": "ECSKTAPPDesiredCount",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSKTAPPDnsServer1",
+    "ParameterValue": "172.16.124.81"
+  },
+  {
+    "ParameterKey": "ECSKTAPPDnsServer2",
+    "ParameterValue": "172.16.124.82"
+  },
+  {
+    "ParameterKey": "ECSKTAPPDnsSearchDomains",
+    "ParameterValue": "tiffco.net"
+  },  
+  {
+    "ParameterKey": "ECSLoggroupRetentionInDays",
+    "ParameterValue": "3653"
+  },
+  {
+    "ParameterKey": "CFTS3BucketName",
+    "ParameterValue": "tiffany-edh-environment-build-prerequisites"
+  },
+  {
+    "ParameterKey": "EDKKTRDSUserparameterstoreName",
+    "ParameterValue": "KT_RDSStgUser"
+  },
+  {
+    "ParameterKey": "EDKKTRDSUserPasswordparameterstoreName",
+    "ParameterValue": "KT_RDSStgPassword"
+  },
+  {
+    "ParameterKey": "EDHKMSKeyIDParameterStoreName",
+    "ParameterValue": "KT_KMSKeyID_Stg"
+  },
+  {
+    "ParameterKey": "CFTS3KeyPrefix",
+    "ParameterValue": "cloudformation/TiffanyEDH-Nested-3"
+  },
+  {
+    "ParameterKey": "EDHTCOMasterStack1",
+    "ParameterValue": "TiffanyEDHStg-Master-1"
+  },  
+  {
+    "ParameterKey": "EDHTCOMasterStack2",
+    "ParameterValue": "TiffanyEDHStg-Master-2"
+  }
+]

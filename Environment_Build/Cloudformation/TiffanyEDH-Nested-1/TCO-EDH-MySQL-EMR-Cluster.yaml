@@ -1,0 +1,1552 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation template deploys MySQL RDS Instance and a EMR Cluster with 1 Master Node and 6 Core nodes with the required Configuration and permissions 
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Configuration
+        Parameters:
+          - Env
+          - Application
+      - Label:
+          default: Network Information
+        Parameters:
+          - VPC
+          - EMRSubnetID
+          - RDSSubnetId   
+          - EDHEMRSubnetCIDR       
+      - Label:
+          default: MySQL Database Information
+        Parameters:
+          - RDSMySQLDBInstanceClass
+          - RDSMySQLDBInstanceIdentifier
+          - RDSMySQLEngine
+          - RDSMySQLDBName
+          - RDSMySQLEngineVersion
+          - RDSMySQLMultiAZ
+          - RDSMySQLOptionGroupName
+          - RDSMySQLStorageType
+          - RDSMySQLAllocatedStorage
+          - RDSMySQLMasterUsername
+          - EDHMySQLRDSUserPasswordPSName
+          - EDHMySQLRDSUserPasswordPSNameVersion
+          - RDSBackupRetentionPeriod
+          - RDSPreferredBackupWindow
+          - RDSPreferredMaintenanceWindow
+          - RDSMySQLPort 
+      - Label:
+          default: Encrypted Database in Multi-AZ
+        Parameters:
+          - RDSMySQLStorageEncrypted                   
+      - Label:
+          default: EMR Cluster Configuration
+        Parameters:
+          - EMRClusterName    
+          - KeyName    
+          - EDHEMRMasterInstanceType
+          - EDHEMRCoreInstanceType
+          - EDHEMRCoreInstanceCount
+          - EMRReleaseLabelVersion 
+          - EBSRootVolumeSize  
+          - EMRBootStrapAction
+          - EMRTLSCertificateobjectUrl
+          - LogUriS3Path       
+          - Terminationprotected
+          - VisibleToAllUsers  
+          - EDHEMRCoreInstanceVolume1Count
+          - EDHEMRCoreVolume1Type
+          - EDHEMRCoreVolume1Size
+          - EDHEMRCoreInstanceRootVolumeCount
+          - EDHEMRCoreRootVolumeType
+          - EDHEMRCoreRootVolumeSize
+          - EDHEMRMasterInstanceCount
+          - EDHEMRMasterRootSize
+          - EDHEMRMasterRootVolumeType
+          - EDHEMRMasterInstanceRootVolumeCount
+          - EDHEMRMasterVolume1Size
+          - EDHEMRMaterVolume1Type
+          - EDHEMRMasterInstanceVolume1Count
+      - Label:
+          default: S3 Bucket Configuration
+        Parameters:
+          - S3EDHScriptsBucketName
+          - S3EDHMessageRAWBucketName
+          - S3EDHMessageErrorBucketName 
+          - S3EDHMessageRefinedBucketName
+          - S3EDHMessagingRepositoryBucketName 
+          - S3EDHTricklepollRawBucketName           
+      - Label:
+          default: EMR AutoScaling Configuration
+        Parameters:
+          - EMRAutoscalingGroupMaxCapacity
+          - EMRAutoscalingGroupMinCapacity  
+      - Label:
+          default: Tagging Configuration
+        Parameters:
+          - EDHTCOTagKey
+          - EDHTCOTagValue                               
+Parameters:
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH    
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value    
+  Env:
+    Description: 'The type of Env? ex: QA/Stg/Prod/New,Old'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - Dev
+      - Qa
+    Default: STG      
+  EMRClusterName:
+    Description: Name of the cluster
+    Type: String
+    Default: AMZEMREDHT01   
+  KeyName:
+    Description: Must be an existing Keyname
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Default: EDH-TCO-EMR-PROD    
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Must be a valid VPC.
+  EDHEMRMasterInstanceType:
+    Description: Instance type to be used for the master instance.
+    Type: String
+    Default: m4.large
+    ConstraintDescription: Please Choose a Valid instance Type.
+  EDHEMRCoreInstanceType:
+    Description: Instance type to be used for core instances.
+    Type: String
+    Default: m4.xlarge
+    ConstraintDescription: Please choose a valid instance type.
+  EDHEMRCoreInstanceCount:
+    Description: The EMR Core Instance Count
+    Type: Number
+    Default: 6        
+  EBSRootVolumeSize:
+    Type: String
+    Description: Must be a valid VolumeSize
+    Default: 100
+  EMRSubnetID:
+    Description: Must be Valid public subnet ID
+    Type: 'AWS::EC2::Subnet::Id'
+    Default: PRD-EDH-TCO-EMR-AZ
+  EMRReleaseLabelVersion:
+    Type: String
+    Description: Must be a valid EMR release version
+    Default: emr-5.0.0
+  LogUriS3Path:
+    Description: An S3 bucket location that Amazon EMR writes logs files to from a job flow.
+    Type: String
+    Default: s3://aws-logs-869052972610-us-east-1/elasticmapreduce/
+  EMRTLSCertificateobjectUrl:
+    Type: String
+    Description: Must be a Valid S3 Object Url For Emr TLSCertificate.
+    Default: s3://amzs3edhpkg/certs/DevEMRCert_Exp05052018.zip  
+  EMRBootStrapAction:
+    Type: String
+    Description: Provide a valid S3 Path (A list of bootstrap actions that Amazon EMR runs before starting applications on the cluster) 
+    Default: s3://amzs3emrscriptsv1.1/scripts/bootstrap-qa.sh          
+  Terminationprotected:
+    Description: Choose the Termination Protection method for your EMR Cluster.
+    Type: String
+    AllowedValues: [True,False]
+    Default: True
+  EMRAutoscalingGroupMaxCapacity:
+    Type: Number
+    Default: '6'
+    Description: The upper boundary of EC2 instances in an instance group beyond which scaling activities are not allowed to grow. 
+  EMRAutoscalingGroupMinCapacity:
+    Type: Number
+    Default: '6'
+    Description: The lower boundary of EC2 instances in an instance group below which scaling activities are not allowed to shrink.       
+  VisibleToAllUsers:
+    Description: Choose the Visibility of your EMR Cluster.
+    Type: String
+    AllowedValues: [True,False]  
+    Default: True  
+  S3EDHMessageRAWBucketName:
+    Type: String
+    Description: Name of the bucket to store the RAW Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrawtest
+  S3EDHMessageErrorBucketName:
+    Type: String
+    Description: Name of the bucket to store the error Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingerrortest
+  S3EDHMessageRefinedBucketName:
+    Type: String
+    Description: Name of the bucket to store the Redfined Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrefinedtest
+  S3EDHMessagingRepositoryBucketName:
+    Type: String
+    Description: Name of the bucket for elasticsearch respository
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingesrepositorytest
+  S3EDHTricklepollRawBucketName:
+    Type: String
+    Description: Name of the bucket to store tricklepoll raw dats
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhtricklepollrawtest 
+  S3EDHScriptsBucketName:
+    Type: String
+    Description: Name of the bucket where the automation scripts are uploaded.     
+  EDHEMRMasterRootSize:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 256   
+  EDHEMRMasterRootVolumeType:
+    Type: String
+    Description: Select the volume type for the volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: gp2     
+  EDHEMRMasterInstanceRootVolumeCount:
+    Type: String
+    Description: The EMR Volume Count per Instance
+    Default: 1      
+  EDHEMRMasterVolume1Size:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 100    
+  EDHEMRMaterVolume1Type:
+    Type: String
+    Description: Select the volume type for the volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: gp2     
+  EDHEMRMasterInstanceVolume1Count:
+    Type: String
+    Description: The EMR Volume Count per Instance
+    Default: 1      
+  EDHEMRMasterInstanceCount:
+    Type: String
+    Description: The EMR Master Instance Count
+    Default: 1      
+  EDHEMRCoreRootVolumeSize:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 2000   
+  EDHEMRCoreRootVolumeType:
+    Type: String
+    Description: Select the volume type for the volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: gp2     
+  EDHEMRCoreInstanceRootVolumeCount:
+    Type: String
+    Description: The EMR Volume Count per Instance
+    Default: 1      
+  EDHEMRCoreVolume1Size:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 100
+  EDHEMRCoreVolume1Type:
+    Type: String
+    Description: Select the volume type for the volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: gp2     
+  EDHEMRCoreInstanceVolume1Count:  
+    Type: String
+    Description: The EMR Volume Count per Instance
+    Default: 1   
+  RDSSubnetId:
+    Description: Private Subnet ID for RDS Primary Instance in Multi-AZ Environment
+    Type: List<AWS::EC2::Subnet::Id>
+  RDSMySQLEngine:
+    Description: MySQL RDS Engine Name
+    Default: MySQL
+    Type: String
+  RDSMySQLEngineVersion:
+    Description: MySQL RDS Engine version
+    Default: 5.7.16
+    Type: String
+  RDSMySQLDBInstanceIdentifier:
+    Description: MySQL RDS DB Instance Identifier
+    Type: String
+    Default: amzdbedht02
+  RDSMySQLDBInstanceClass:
+    Description: The MySQL RDS instance type.
+    Type: String
+    Default: db.r5.large
+    ConstraintDescription: must select a valid database instance type.
+  RDSMySQLMultiAZ:
+    Description: MultiAZ option check for the MySQL RDS instance
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  RDSMySQLStorageType:
+    Description: The storage type associated with the MySQL RDS DB instance.
+    Default: 'gp2'
+    AllowedValues:
+      - 'gp2'
+      - 'standard'
+    Type: String
+  RDSMySQLAllocatedStorage:
+    Description: Allocate Storage in (GiB) for MySQL RDS
+    Type: String
+    MinLength: '1'
+    MaxLength: '5'    
+    Default: 100
+  RDSMySQLOptionGroupName:
+    Description: Option Group Details for MySQL RDS
+    Default: default:mysql-5-7
+    Type: String
+  RDSMySQLMasterUsername:
+    Description: Option Group Details for MySQL RDS
+    Type: String
+    Default: hive
+  RDSMySQLStorageEncrypted:
+    Description: MySQL RDS DB instance encryption
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  RDSPreferredMaintenanceWindow:  
+    Description: The weekly time range during which system maintenance can occur.
+    Type: 'String'
+    Default: 'thu:04:12-thu:04:42' 
+  RDSPreferredBackupWindow:
+    Description: The daily time range during which automated backups are performed.
+    Type: 'String'
+    Default: '04:54-05:24'
+  RDSBackupRetentionPeriod:
+    Description: The number of days the automated snapshots needs to be retained.
+    Type: 'String'
+    MinLength: 1
+    MaxLength: 3
+    Default: '20'
+  EDHMySQLRDSUserPasswordPSName:
+    Type: AWS::SSM::Parameter::Name 
+    Description: Parameter Store Name for the MySQL RDS Master user Password.
+  EDHMySQLRDSUserPasswordPSNameVersion:
+    Type: Number
+    Description: Parameter Store Version for the MySQL RDS Master user Password
+    Default: 1
+  RDSMySQLPort:
+    Type: String
+    Description: MySQL RDS Port Number
+    Default: 3306  
+  EDHEMRSubnetCIDR:
+    Description: EMR Subnet CIDR
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.100.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'    
+  RDSMySQLDBName:
+    Description: The name of the first database to be created for MySQL RDS.
+    Type: String
+    Default: hive 
+Mappings:    
+  NameMap: 
+    PROD: 
+      lowecase: "prod"
+    TEST: 
+      lowecase: "test"
+    STG: 
+      lowecase: "stg"
+    DEV: 
+      lowecase: "dev"  
+    QA: 
+      lowecase: "qa" 
+  CamelCaseMap: 
+    PROD: 
+      lowecase: "Prod"
+    TEST: 
+      lowecase: "Test"
+    STG: 
+      lowecase: "Stg"
+    DEV: 
+      lowecase: "Dev"  
+    QA: 
+      lowecase: "Qa" 
+Conditions: 
+  MySQLRDSEncrypteDB: !Equals 
+    - !Ref RDSMySQLStorageEncrypted
+    - 'true'                                      
+Resources:
+  RDSMySQLDBInstanceEncryptionKey:
+    Type: AWS::KMS::Key
+    Condition: MySQLRDSEncrypteDB
+    Properties:
+      Description: !Sub EDH-TCO-MYSQL-${Env}
+      Enabled: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow access for Key Administrators
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: Allow use of the key
+            Effect: Allow
+            Principal: '*'            
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: Allow attachment of persistent resources
+            Effect: Allow
+            Principal: '*' 
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                'kms:GrantIsForAWSResource': 'true'              
+      Tags:
+        - Key: Name
+          Value: !Sub EDH-TCO-MYSQL-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  RDSMySQLDBInstanceEncryptionAlias:
+    Type: AWS::KMS::Alias
+    Condition: MySQLRDSEncrypteDB
+    Properties:
+      AliasName: !Sub alias/EDH-TCO-MySQL-${Env}
+      TargetKeyId: !Ref RDSMySQLDBInstanceEncryptionKey                        
+  RDSMySQLDBSecurityGroups:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref VPC
+      GroupName: !Sub EDH-${Env}-MySQL-SG
+      GroupDescription: >-
+        Security groups rules For MySQL RDS
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3306'
+          ToPort: '3306'
+          CidrIp: !Ref EDHEMRSubnetCIDR
+      Tags:
+        - Key: Name
+          Value: !Sub EDH-${Env}-MySQL-SG
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue       
+  RDSDBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: Default parameter group for mysql5.7
+      Family: mysql5.7
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-RDSMySQL-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue   
+  RDSMySQLDBSubnetGroupName:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub ${Env}-EDH-TCO-INF-MySQLDB-SG
+      SubnetIds: !Ref RDSSubnetId
+      Tags:
+        - Key: Name
+          Value: !Join
+          - ''
+          - - !FindInMap
+              - NameMap
+              - !Ref 'Env'
+              - lowecase
+            - '-edh-tco-inf-mysqldb-sg'
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue   
+  RDSMySQLDBInstance:
+    DependsOn:
+      - RDSMySQLDBSubnetGroupName
+      - RDSMySQLDBSecurityGroups
+      - RDSDBParameterGroup
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref RDSMySQLDBName
+      AllocatedStorage: !Ref RDSMySQLAllocatedStorage   
+      DBInstanceClass: !Ref RDSMySQLDBInstanceClass
+      Engine: !Ref RDSMySQLEngine
+      EngineVersion: !Ref RDSMySQLEngineVersion
+      MasterUsername: !Ref RDSMySQLMasterUsername
+      MasterUserPassword: !Sub '{{resolve:ssm:${EDHMySQLRDSUserPasswordPSName}:${EDHMySQLRDSUserPasswordPSNameVersion}}}'
+      DBInstanceIdentifier: !Ref RDSMySQLDBInstanceIdentifier
+      BackupRetentionPeriod: !Ref RDSBackupRetentionPeriod
+      CopyTagsToSnapshot: true
+      PreferredBackupWindow: !Ref RDSPreferredBackupWindow
+      PreferredMaintenanceWindow: !Ref RDSPreferredMaintenanceWindow
+      DeleteAutomatedBackups: false       
+      VPCSecurityGroups:
+        - !Ref RDSMySQLDBSecurityGroups
+      DBSubnetGroupName: !Ref RDSMySQLDBSubnetGroupName
+      DBParameterGroupName: !Ref RDSDBParameterGroup
+      MultiAZ: !Ref RDSMySQLMultiAZ
+      OptionGroupName: !Ref RDSMySQLOptionGroupName 
+      StorageEncrypted: !Ref RDSMySQLStorageEncrypted
+      StorageType: !Ref RDSMySQLStorageType   
+      Port: !Ref RDSMySQLPort
+      Tags:
+        - Key: Name
+          Value: !Sub RDSMySQL-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue             
+      KmsKeyId: !If 
+        - MySQLRDSEncrypteDB
+        - !Ref RDSMySQLDBInstanceEncryptionKey
+        - !Ref 'AWS::NoValue'  
+  EMRMasterSecurityGroups:
+    Type: 'AWS::EC2::SecurityGroup'
+    DependsOn:
+      - RDSMySQLDBSecurityGroups
+    Properties:
+      VpcId: !Ref VPC
+      GroupName: !Join
+            - ''
+            - - 'ElasticMapReduce-Master-Private-'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase 
+      GroupDescription: >-
+         Master security group for ElasticMapReduce
+      SecurityGroupIngress:        
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '16020'
+          ToPort: '16020'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '1620'
+          ToPort: '1620'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '16010'
+          ToPort: '16010'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '16010'
+          ToPort: '16010'
+          CidrIp: 172.16.0.0/12 
+        - IpProtocol: tcp
+          FromPort: '16000'
+          ToPort: '16000'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '16000'
+          ToPort: '16000'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8443'
+          ToPort: '8443'
+          CidrIp: 0.0.0.0/0         
+        - IpProtocol: tcp
+          FromPort: '9090'
+          ToPort: '9090'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '9090'
+          ToPort: '9090'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8085'
+          ToPort: '8085'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8085'
+          ToPort: '8085'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8088'
+          ToPort: '8088'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8088'
+          ToPort: '8088'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '9098'
+          ToPort: '9098'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '9098'
+          ToPort: '9098'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '9095'
+          ToPort: '9095'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '9095'
+          ToPort: '9095'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8888'
+          ToPort: '8888'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8888'
+          ToPort: '8888'
+          CidrIp: 172.16.0.0/12          
+        - IpProtocol: tcp
+          FromPort: '8042'
+          ToPort: '8042'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8042'
+          ToPort: '8042'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.192.11.196/32
+        - IpProtocol: tcp
+          FromPort: '1000'
+          ToPort: '1000'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '1000'
+          ToPort: '1000'
+          CidrIp: 10.255.0.0/16 
+        - IpProtocol: tcp
+          FromPort: '8070'
+          ToPort: '8070'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8070'
+          ToPort: '8070'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '16030'
+          ToPort: '16030'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '16030'
+          ToPort: '16030'
+          CidrIp: 10.255.0.0/16                                            
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - 'ElasticMapReduce-Master-Private-'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue                
+  EMRSlaveSecurityGroups:
+    Type: 'AWS::EC2::SecurityGroup'
+    DependsOn: 
+      - EMRMasterSecurityGroups    
+    Properties:
+      VpcId: !Ref VPC
+      GroupName: !Join
+            - ''
+            - - 'ElasticMapReduce-Slave-Private-'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase      
+      GroupDescription: >-
+         Slave security group for the Elastic MapReduce
+      SecurityGroupIngress:        
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '16020'
+          ToPort: '16020'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '1620'
+          ToPort: '1620'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '16010'
+          ToPort: '16010'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '16010'
+          ToPort: '16010'
+          CidrIp: 172.16.0.0/12 
+        - IpProtocol: tcp
+          FromPort: '16000'
+          ToPort: '16000'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '16000'
+          ToPort: '16000'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8443'
+          ToPort: '8443'
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: '9090'
+          ToPort: '9090'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '9090'
+          ToPort: '9090'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8085'
+          ToPort: '8085'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8085'
+          ToPort: '8085'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8088'
+          ToPort: '8088'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8088'
+          ToPort: '8088'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '9098'
+          ToPort: '9098'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '9098'
+          ToPort: '9098'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '9095'
+          ToPort: '9095'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '9095'
+          ToPort: '9095'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8888'
+          ToPort: '8888'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8042'
+          ToPort: '8042'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8042'
+          ToPort: '8042'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.192.11.196/32
+        - IpProtocol: tcp
+          FromPort: '1000'
+          ToPort: '1000'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '1000'
+          ToPort: '1000'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '1000'
+          ToPort: '1000'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.192.11.196/32 
+        - IpProtocol: tcp
+          FromPort: '8070'
+          ToPort: '8070'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8070'
+          ToPort: '8070'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '16030'
+          ToPort: '16030'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '16030'
+          ToPort: '16030'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: udp
+          FromPort: '16010'
+          ToPort: '16010'
+          CidrIp: 172.16.0.0/12
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - 'ElasticMapReduce-Slave-Private-'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase 
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue               
+  EMRServiceaccesssecurityGroups:
+    Type: 'AWS::EC2::SecurityGroup'
+    DependsOn: 
+      - EMRMasterSecurityGroups
+      - EMRSlaveSecurityGroups
+    Properties:
+      GroupName: !Join
+            - ''
+            - - 'ElasticMapReduce-ServiceAccess-'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase       
+      VpcId: !Ref VPC
+      GroupDescription: >-
+         Service access group for Elastic MapReduce.
+      SecurityGroupEgress:        
+        - IpProtocol: tcp
+          FromPort: '8443'
+          ToPort: '8443'
+          SourceSecurityGroupId: !Ref EMRMasterSecurityGroups
+        - IpProtocol: tcp
+          FromPort: '8443'
+          ToPort: '8443'
+          SourceSecurityGroupId: !Ref EMRSlaveSecurityGroups
+      Tags:
+        - Key: Name
+          Value: !Join
+            - ''
+            - - 'ElasticMapReduce-ServiceAccess-'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue   
+  EMRKMSKEY:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub EDH-TCO-Linux-${Env}-Key
+      Enabled: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow access for Key Administrators
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: Allow use of the key
+            Effect: Allow
+            Principal: '*'            
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: Allow attachment of persistent resources
+            Effect: Allow
+            Principal: '*' 
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                'kms:GrantIsForAWSResource': 'true'
+      Tags:
+        - Key: Name
+          Value: !Sub AWZLINEDH-${Env}
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue                 
+  EMRSecurityConfiguration:
+    Type: AWS::EMR::SecurityConfiguration  
+    DependsOn:
+      - EMRKMSKEY
+      - RDSMySQLDBInstance
+    Properties:
+      Name: !Ref EMRClusterName
+      SecurityConfiguration:
+        EncryptionConfiguration:
+          EnableInTransitEncryption: true
+          EnableAtRestEncryption: true
+          InTransitEncryptionConfiguration:
+            TLSCertificateConfiguration:
+              CertificateProviderType: PEM
+              S3Object: !Ref EMRTLSCertificateobjectUrl
+          AtRestEncryptionConfiguration:
+            S3EncryptionConfiguration:
+              EncryptionMode: SSE-S3
+              AwsKmsKey: !GetAtt EMRKMSKEY.Arn
+            LocalDiskEncryptionConfiguration:
+              EncryptionKeyProviderType: AwsKms
+              AwsKmsKey: !GetAtt EMRKMSKEY.Arn                
+  EMRCluster:
+    Type: 'AWS::EMR::Cluster'    
+    DependsOn:
+      - EMRRole
+      - EMRAutoScalingDefaultRole
+      - EMRClusterinstanceProfile
+      - EC2instanceRole
+      - EMRSecurityGroupEgress
+      - RDSMySQLDBInstance
+    Properties:
+      Applications:
+        - Name: HBase
+        - Name: Hive        
+        - Name: Spark 
+        - Name: Zeppelin 
+        - Name: Tez 
+        - Name: Mahout 
+        - Name: Ganglia 
+        - Name: Hue  
+        - Name: Pig   
+      BootstrapActions: 
+        - Name: Custom
+          ScriptBootstrapAction: 
+            Path: !Ref EMRBootStrapAction    
+      Configurations:
+        - Classification: core-site
+          ConfigurationProperties:
+            fs.s3n.server-side-encryption-algorithm: AES256
+            hadoop.proxyuser.infoadmin.groups: '*'
+            fs.s3n.multipart.uploads.enabled: 'true'
+            fs.s3.enableServerSideEncryption: 'true'
+            fs.s3a.server-side-encryption-algorithm: AES256
+            fs.s3.ssl.enabled: 'true'
+            hadoop.proxyuser.yarn.hosts: '*'
+            hadoop.proxyuser.infoadmin.hosts: '*'
+            hadoop.proxyuser.yarn.groups: '*' 
+        - Classification: hive-site
+          ConfigurationProperties:  
+            javax.jdo.option.ConnectionUserName: !Ref RDSMySQLMasterUsername
+            javax.jdo.option.ConnectionDriverName: org.mariadb.jdbc.Driver
+            javax.jdo.option.ConnectionPassword: !Sub '{{resolve:ssm:${EDHMySQLRDSUserPasswordPSName}:${EDHMySQLRDSUserPasswordPSNameVersion}}}'
+            javax.jdo.option.ConnectionURL: !Join ['', ['jdbc:mysql://', !GetAtt [RDSMySQLDBInstance, Endpoint.Address], ':', !GetAtt [RDSMySQLDBInstance, Endpoint.Port], /, !Ref 'RDSMySQLDBName']]                                  
+        - Classification: hdfs-site
+          ConfigurationProperties:      
+            dfs.block.size: '268435456'
+            dfs.replication: '3'  
+        - Classification: hbase-site
+          ConfigurationProperties: 
+            hbase.regionserver.handler.count: '30'  
+        - Classification: zookeeper-config
+          ConfigurationProperties: 
+            hbase.zookeeper.property.maxClientCnxns: '100' 
+        - Classification: yarn-site
+          ConfigurationProperties:
+            yarn.nodemanager.pmem-check-enabled: 'false'
+            yarn.nodemanager.vmem-check-enabled: 'true'     
+      Instances:
+        Ec2KeyName: !Ref KeyName
+        Ec2SubnetId: !Ref EMRSubnetID
+        TerminationProtected: !Ref Terminationprotected
+        EmrManagedMasterSecurityGroup: !Ref EMRMasterSecurityGroups
+        EmrManagedSlaveSecurityGroup: !Ref EMRSlaveSecurityGroups
+        ServiceAccessSecurityGroup: !Ref EMRServiceaccesssecurityGroups
+        MasterInstanceGroup:
+          EbsConfiguration:
+            EbsBlockDeviceConfigs:
+              - VolumeSpecification:
+                  SizeInGB: !Ref EDHEMRMasterRootSize #'256'
+                  VolumeType: !Ref EDHEMRMasterRootVolumeType #gp2
+                VolumesPerInstance: !Ref EDHEMRMasterInstanceRootVolumeCount #'1'
+              - VolumeSpecification:
+                  SizeInGB: !Ref EDHEMRMasterVolume1Size #'100'
+                  VolumeType: !Ref EDHEMRMaterVolume1Type #gp2
+                VolumesPerInstance: !Ref EDHEMRMasterInstanceVolume1Count #'1'                
+            EbsOptimized: 'true'                  
+          InstanceCount: !Ref EDHEMRMasterInstanceCount #1
+          InstanceType: !Ref EDHEMRMasterInstanceType
+          Market: ON_DEMAND
+          Name: Master
+        CoreInstanceGroup:
+          EbsConfiguration:
+            EbsBlockDeviceConfigs:
+              - VolumeSpecification:
+                  SizeInGB: !Ref EDHEMRCoreRootVolumeSize #'2000'
+                  VolumeType: !Ref EDHEMRCoreRootVolumeType #gp2
+                VolumesPerInstance: !Ref EDHEMRCoreInstanceRootVolumeCount #'1'
+              - VolumeSpecification:
+                  SizeInGB: !Ref EDHEMRCoreVolume1Size #'100'
+                  VolumeType: !Ref EDHEMRCoreVolume1Type #gp2
+                VolumesPerInstance: !Ref EDHEMRCoreInstanceVolume1Count #'1'                
+            EbsOptimized: 'true'          
+          AutoScalingPolicy:
+            Constraints:
+              MinCapacity: !Ref EMRAutoscalingGroupMaxCapacity
+              MaxCapacity: !Ref EMRAutoscalingGroupMinCapacity
+            Rules:
+              - Name: Scale-out
+                Description: Scale-out policy
+                Action:
+                  SimpleScalingPolicyConfiguration:
+                    CoolDown: 300
+                    AdjustmentType: CHANGE_IN_CAPACITY
+                    ScalingAdjustment: 1                
+                Trigger:
+                  CloudWatchAlarmDefinition:
+                    MetricName: MemoryAvailableMB
+                    Unit: COUNT
+                    Namespace: AWS/ElasticMapReduce
+                    Threshold: 5000
+                    Dimensions:
+                      - Key: JobFlowId
+                        Value: '${emr.clusterId}'
+                    EvaluationPeriods: 1
+                    Period: 300
+                    ComparisonOperator: LESS_THAN
+                    Statistic: AVERAGE
+              - Name: Scale-in
+                Description: Scale-in policy
+                Action:
+                  SimpleScalingPolicyConfiguration:
+                    CoolDown: 300
+                    AdjustmentType: CHANGE_IN_CAPACITY
+                    ScalingAdjustment: -1                 
+                Trigger:
+                  CloudWatchAlarmDefinition:
+                    MetricName: MemoryAvailableMB
+                    Unit: COUNT
+                    Namespace: AWS/ElasticMapReduce
+                    Threshold: 15000
+                    Dimensions:
+                      - Key: JobFlowId
+                        Value: '${emr.clusterId}'
+                    EvaluationPeriods: 1
+                    Period: 300
+                    ComparisonOperator: GREATER_THAN
+                    Statistic: AVERAGE 
+          InstanceCount: !Ref EDHEMRCoreInstanceCount
+          InstanceType: !Ref EDHEMRCoreInstanceType
+          Market: ON_DEMAND
+          Name: Core      
+      VisibleToAllUsers: !Ref VisibleToAllUsers
+      JobFlowRole: !Ref EMRClusterinstanceProfile
+      ReleaseLabel: !Ref EMRReleaseLabelVersion
+      LogUri: !Ref LogUriS3Path
+      EbsRootVolumeSize: !Ref EBSRootVolumeSize
+      SecurityConfiguration: !Ref EMRSecurityConfiguration
+      ScaleDownBehavior: TERMINATE_AT_TASK_COMPLETION 
+      Name: !Ref EMRClusterName
+      AutoScalingRole: !Ref EMRAutoScalingDefaultRole
+      ServiceRole: !Ref EMRRole                
+      Tags:
+        - Key: Name
+          Value: !Ref EMRClusterName
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EMRSecurityGroupEgress:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn:
+      - EMRMasterSecurityGroups
+      - RDSMySQLDBSecurityGroups
+    Properties: 
+      Description: Security Group Ingress rule for the MySQL RDS
+      FromPort: 3306
+      GroupId: !GetAtt RDSMySQLDBSecurityGroups.GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId: !GetAtt EMRMasterSecurityGroups.GroupId
+      ToPort: 3306         
+  EMRRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+            - ''
+            - - 'EMRDefault'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase 
+              - 'Role'
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [elasticmapreduce.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: AmazonElasticMapReduceRole
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:AuthorizeSecurityGroupEgress'
+              - 'ec2:AuthorizeSecurityGroupIngress'
+              - 'ec2:CancelSpotInstanceRequests'
+              - 'ec2:CreateNetworkInterface'
+              - 'ec2:CreateSecurityGroup'
+              - 'ec2:CreateTags'
+              - 'ec2:DeleteNetworkInterface'
+              - 'ec2:DeleteSecurityGroup'
+              - 'ec2:DeleteTags'
+              - 'ec2:DescribeAvailabilityZones'
+              - 'ec2:DescribeAccountAttributes'
+              - 'ec2:DescribeDhcpOptions'
+              - 'ec2:DescribeImages'
+              - 'ec2:DescribeInstanceStatus'
+              - 'ec2:DescribeInstances'
+              - 'ec2:DescribeKeyPairs'
+              - 'ec2:DescribeNetworkAcls'
+              - 'ec2:DescribeNetworkInterfaces'
+              - 'ec2:DescribePrefixLists'
+              - 'ec2:DescribeRouteTables'
+              - 'ec2:DescribeSecurityGroups'
+              - 'ec2:DescribeSpotInstanceRequests'
+              - 'ec2:DescribeSpotPriceHistory'
+              - 'ec2:DescribeSubnets'
+              - 'ec2:DescribeTags'
+              - 'ec2:DescribeVpcAttribute'
+              - 'ec2:DescribeVpcEndpoints'
+              - 'ec2:DescribeVpcEndpointServices'
+              - 'ec2:DescribeVpcs'
+              - 'ec2:DetachNetworkInterface'
+              - 'ec2:ModifyImageAttribute'
+              - 'ec2:ModifyInstanceAttribute'
+              - 'ec2:RequestSpotInstances'
+              - 'ec2:RevokeSecurityGroupEgress'
+              - 'ec2:RunInstances'
+              - 'ec2:TerminateInstances'
+              - 'ec2:DeleteVolume'
+              - 'ec2:DescribeVolumeStatus'
+              - 'ec2:DescribeVolumes'
+              - 'ec2:DetachVolume'
+              - 'iam:GetRole'
+              - 'iam:GetRolePolicy'
+              - 'iam:ListInstanceProfiles'
+              - 'iam:ListRolePolicies'
+              - 'iam:PassRole'
+              - 's3:CreateBucket'
+              - 's3:Get*'
+              - 's3:List*'
+              - 'sdb:BatchPutAttributes'
+              - 'sdb:Select'
+              - 'sqs:CreateQueue'
+              - 'sqs:Delete*'
+              - 'sqs:GetQueue*'
+              - 'sqs:PurgeQueue'
+              - 'sqs:ReceiveMessage'
+              - 'cloudwatch:PutMetricAlarm'
+              - 'cloudwatch:DescribeAlarms'
+              - 'cloudwatch:DeleteAlarms'
+              - 'application-autoscaling:RegisterScalableTarget'
+              - 'application-autoscaling:DeregisterScalableTarget'
+              - 'application-autoscaling:PutScalingPolicy'
+              - 'application-autoscaling:DeleteScalingPolicy'
+              - 'application-autoscaling:Describe*'
+            Resource: '*'              
+          - Effect: Allow
+            Action: 'iam:CreateServiceLinkedRole'
+            Resource: >-
+              'arn:aws:iam::*:role/aws-service-role/spot.amazonaws.com/AWSServiceRoleForEC2Spot*'
+            Condition:
+              StringLike:
+                'iam:AWSServiceName': spot.amazonaws.com    
+      - PolicyName: !Join
+          - ''
+          - - 'EC2_'
+            - !FindInMap
+              - CamelCaseMap
+              - !Ref 'Env'
+              - lowecase          
+            - 'S3AccessPolicy'
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: 
+              - 's3:*'
+            Resource:
+              - "arn:aws:s3:::amzs3edhdev"
+              - "arn:aws:s3:::amzs3edhdev/*"
+              - "arn:aws:s3:::amzs3edhtest"
+              - "arn:aws:s3:::amzs3edhtest/*"
+              - "arn:aws:s3:::amzs3edhqa"
+              - "arn:aws:s3:::amzs3edhqa/*"
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'              
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}/*'   
+              - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}/*'                            
+  EMRAutoScalingDefaultRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+            - ''
+            - - 'EMRAutoScalingDefault_'
+              - !FindInMap
+                - CamelCaseMap
+                - !Ref 'Env'
+                - lowecase 
+              - 'Role' 
+      AssumeRolePolicyDocument:
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service: [elasticmapreduce.amazonaws.com]
+            Action: ['sts:AssumeRole']
+          - Effect: Allow
+            Principal:
+              Service: [application-autoscaling.amazonaws.com]
+            Action: ['sts:AssumeRole']          
+      Path: /
+      Policies: 
+      - PolicyName: AmazonElasticMapReduceRole
+        PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                  - 'cloudwatch:DescribeAlarms'
+                  - 'elasticmapreduce:ListInstanceGroups'
+                  - 'elasticmapreduce:ModifyInstanceGroups' 
+              Resource: '*'  
+      - PolicyName: !Join
+          - ''
+          - - 'EC2_'
+            - !FindInMap
+              - CamelCaseMap
+              - !Ref 'Env'
+              - lowecase          
+            - 'S3AccessPolicy'
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: 
+              - 's3:*'
+            Resource:
+              - "arn:aws:s3:::amzs3edhdev"
+              - "arn:aws:s3:::amzs3edhdev/*"
+              - "arn:aws:s3:::amzs3edhtest"
+              - "arn:aws:s3:::amzs3edhtest/*"
+              - "arn:aws:s3:::amzs3edhqa"
+              - "arn:aws:s3:::amzs3edhqa/*"
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'               
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}/*' 
+              - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}/*'                             
+  EC2instanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Join
+                - ''
+                - - 'EMREC2default_'
+                  - !FindInMap
+                    - CamelCaseMap
+                    - !Ref 'Env'
+                    - lowecase 
+                  - 'Role'
+      AssumeRolePolicyDocument:
+          Statement:
+          - Effect: Allow
+            Principal:
+              Service: [ec2.amazonaws.com]
+            Action: ['sts:AssumeRole']          
+      Path: /
+      Policies: 
+      - PolicyName: AmazonElasticMapReduceforEC2Role
+        PolicyDocument:
+            Statement:
+            - Effect: Allow
+              Action:
+                - 'cloudwatch:*'
+                - 'dynamodb:*'
+                - 'ec2:Describe*'
+                - 'elasticmapreduce:Describe*'
+                - 'elasticmapreduce:ListBootstrapActions'
+                - 'elasticmapreduce:ListClusters'
+                - 'elasticmapreduce:ListInstanceGroups'
+                - 'elasticmapreduce:ListInstances'
+                - 'elasticmapreduce:ListSteps'
+                - 'kinesis:CreateStream'
+                - 'kinesis:DeleteStream'
+                - 'kinesis:DescribeStream'
+                - 'kinesis:GetRecords'
+                - 'kinesis:GetShardIterator'
+                - 'kinesis:MergeShards'
+                - 'kinesis:PutRecord'
+                - 'kinesis:SplitShard'
+                - 'rds:Describe*'
+                - "kms:Create*"
+                - "kms:Describe*"
+                - "kms:Enable*"
+                - "kms:List*"
+                - "kms:Put*"
+                - "kms:Update*"
+                - "kms:Revoke*"
+                - "kms:Disable*"
+                - "kms:Get*"
+                - "kms:Delete*"
+                - "kms:ScheduleKeyDeletion"
+                - "kms:CancelKeyDeletion"
+                - "kms:Encrypt"
+                - "kms:Decrypt"
+                - "kms:ReEncrypt*"
+                - "kms:GenerateDataKey*"
+                - "kms:DescribeKey"                
+                - 's3:*'
+                - 'sdb:*'
+                - 'sns:*'
+                - 'sqs:*'
+                - 'glue:CreateDatabase'
+                - 'glue:UpdateDatabase'
+                - 'glue:DeleteDatabase'
+                - 'glue:GetDatabase'
+                - 'glue:GetDatabases'
+                - 'glue:CreateTable'
+                - 'glue:UpdateTable'
+                - 'glue:DeleteTable'
+                - 'glue:GetTable'
+                - 'glue:GetTables'
+                - 'glue:GetTableVersions'
+                - 'glue:CreatePartition'
+                - 'glue:BatchCreatePartition'
+                - 'glue:UpdatePartition'
+                - 'glue:DeletePartition'
+                - 'glue:BatchDeletePartition'
+                - 'glue:GetPartition'
+                - 'glue:GetPartitions'
+                - 'glue:BatchGetPartition'
+                - 'glue:CreateUserDefinedFunction'
+                - 'glue:UpdateUserDefinedFunction'
+                - 'glue:DeleteUserDefinedFunction'
+                - 'glue:GetUserDefinedFunction'
+                - 'glue:GetUserDefinedFunctions'     
+              Resource: '*'                             
+      - PolicyName: !Join
+        - ''
+        - - 'EC2_'
+          - !FindInMap
+            - CamelCaseMap
+            - !Ref 'Env'
+            - lowecase 
+          - 'S3Policy'
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: 
+              - 's3:*'
+            Resource:
+              - "arn:aws:s3:::amzs3edhdev"
+              - "arn:aws:s3:::amzs3edhdev/*"
+              - "arn:aws:s3:::amzs3edhtest"
+              - "arn:aws:s3:::amzs3edhtest/*"
+              - "arn:aws:s3:::amzs3edhqa"
+              - "arn:aws:s3:::amzs3edhqa/*"
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'               
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}/*'                              
+  EMRClusterinstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      InstanceProfileName: !Join
+        - ''
+        - - 'EMREC2Default_'
+          - !FindInMap
+            - CamelCaseMap
+            - !Ref 'Env'
+            - lowecase 
+          - 'Role'
+      Path: /
+      Roles:
+        - !Ref EC2instanceRole
+Outputs:  
+  EMRClusterName:
+    Description: EMR Cluster Name
+    Value: !Ref 'EMRClusterName'
+  EmrManagedMasterSecurityGroup:
+    Description: EMR Master Secuirty Group ID
+    Value: !Ref 'EMRMasterSecurityGroups'
+  EmrManagedSlaveSecurityGroup:
+    Description: EMR Slave Secuirty Group ID
+    Value: !Ref 'EMRSlaveSecurityGroups'
+  EmrServiceAccessSecurityGroup:
+    Description: EMR Service Secuirty Group ID
+    Value: !Ref 'EMRServiceaccesssecurityGroups' 
+  MySQLJDBCConnectionString:
+    Description: JDBC connection string for the database
+    Value: !Join ['', ['jdbc:mysql://', !GetAtt [RDSMySQLDBInstance, Endpoint.Address], ':', !GetAtt [RDSMySQLDBInstance, Endpoint.Port], /, !Ref 'RDSMySQLDBName']]
+  MySQLEndpointAddress:
+    Description: MySQL DB Endpoint Address
+    Value: !GetAtt RDSMySQLDBInstance.Endpoint.Address  
+  RDSMySQLInstanceName:
+    Description: Name of the DB Instance
+    Value:
+      Ref: RDSMySQLDBInstance
+  RDSMySQLParameterGroupName:
+    Description: Name of parameter group
+    Value:
+      Ref: RDSDBParameterGroup
+  RDSMySQLSubnetGroupName:
+    Description: Name of cluster subnet group
+    Value:
+      Ref: RDSMySQLDBSubnetGroupName  
+  RDSMySQLDBSecurityGroupsID:
+    Description: MySQL RDS SecurityGroup ID    
+    Value: !GetAtt RDSMySQLDBSecurityGroups.GroupId           

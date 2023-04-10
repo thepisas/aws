@@ -1,0 +1,215 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation template deploys a EDH Informatica BDM instance SecurityGroup with the required rules and configurations.
+Parameters:  
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG
+  EDHTCOVPCMasterStack:
+    Description: >-
+      Name of an active CloudFormation stack that contains the networking
+      resources, such as the subnet and security group, that will be used in
+      this stack.
+    Type: String   
+  EDHTCOMasterStack:
+    Description: >-
+      Name of an active CloudFormation stack that contains the infrastructure
+      resources, such as RDS, Redshift and Informatica Server.
+    Type: String            
+Mappings:
+  NameMap:
+    PROD:
+      lowecase: "prod"
+    TEST:
+      lowecase: "test"
+    STG:
+      lowecase: "stg"
+    DEV:
+      lowecase: "dev"
+    QA:
+      lowecase: "qa"
+  CamelCaseMap:
+    PROD:
+      camelcase: "Prod"
+    TEST:
+      camelcase: "Test"
+    STG:
+      camelcase: "Stg"
+    DEV:
+      camelcase: "Dev"
+    QA:
+      camelcase: "Qa"
+Resources:
+  EDHINFBDMSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub SG-CHG0114418-${Env}
+      VpcId:
+        'Fn::ImportValue':
+          'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'         
+      GroupDescription: SG for INF BDM EC2 instances
+      Tags:
+        - Key: Name
+          Value: !Sub SG-CHG0114418-${Env}
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'              
+        - Key: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'          
+          Value: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'             
+      SecurityGroupIngress:
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 7333
+          ToPort: 7333
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 7333
+          ToPort: 7333
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 8443
+          ToPort: 8443
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 6008
+          ToPort: 6008        
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 6008
+          ToPort: 6008
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 8085
+          ToPort: 8085
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 8085
+          ToPort: 8085
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 7006
+          ToPort: 7006        
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 7006
+          ToPort: 7006
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 0.0.0.0/0 
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 8084
+          ToPort: 8084
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 8084
+          ToPort: 8084
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 10370
+          ToPort: 10370        
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 10370
+          ToPort: 10370            
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 7005
+          ToPort: 7005          
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 7005
+          ToPort: 7005
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 8095
+          ToPort: 8095
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 8095
+          ToPort: 8095
+        - CidrIp: 64.106.131.250/32
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 10.193.1.183/32
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 172.28.26.244/32
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 172.28.26.245/32
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22 
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 6005
+          ToPort: 6114 
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 6005
+          ToPort: 6114 
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 6005
+          ToPort: 6005 
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 6005
+          ToPort: 6005 
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 10250
+          ToPort: 10250 
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 10250
+          ToPort: 10250 
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 16080
+          ToPort: 16080 
+        - CidrIp: 172.16.0.0/16
+          IpProtocol: tcp
+          FromPort: 16080
+          ToPort: 16080 
+        - SourceSecurityGroupId: 'sg-0ace4a12672a31510'
+          IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535 
+        - SourceSecurityGroupId: 'sg-08ffa1e1c78ff4073'
+          IpProtocol: -1
+          FromPort: 0
+          ToPort: 65535 

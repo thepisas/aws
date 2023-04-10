@@ -1,0 +1,448 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: CloudFormation Template to launch Oracle RDS database Instance with the required SubnetGroup and parameter group.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: General Configuration
+        Parameters:
+          - Env
+          - Application
+      - Label:
+          default: Network Information
+        Parameters:
+          - RDSOracleVPCID
+          - RDSSubnetId
+      - Label:
+          default: Database Information
+        Parameters:
+          - RDSOracleDBInstanceClass
+          - RDSOracleDBInstanceIdentifier
+          - RDSOracleEngine
+          - RDSOracleDBName
+          - RDSOracleEngineVersion
+          - RDSOracleMultiAZ
+          - RDSOraclePort
+          - RDSOracleOptionGroupName
+          - RDSOracleStorageType
+          - RDSOracleAllocatedStorage
+          - RDSOracleMasterUsername
+          - EDHOracleRDUserPasswordPSName
+          - EDHOracleRDUserPasswordPSNameVersion
+          - EDHOraclePassVersion
+          - RDSOracleLicenseModel
+          - RDSAutoMinorVersionUpgrade
+          - RDSBackupRetentionPeriod
+          - RDSPreferredBackupWindow
+          - RDSPreferredMaintenanceWindow          
+      - Label:
+          default: Encrypted Database in Multi-AZ
+        Parameters:
+          - RDSOracleStorageEncrypted          
+      - Label:
+          default: Oracle RDS SecurityGroup Configuration
+        Parameters:
+          - EDHINFSubnetCIDR
+          - EDHEMRSubnetCIDR       
+      - Label:
+          default: Tagging Configuration
+        Parameters:
+          - EDHTCOTagKey
+          - EDHTCOTagValue               
+Parameters:        
+  Env :
+    Description: 'The type of Env? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH      
+  RDSOracleVPCID:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC that allows instances Network access.
+  RDSSubnetId:
+    Description: Private Subnet ID for RDS Primary Instance in Multi-AZ Environment
+    Type: List<AWS::EC2::Subnet::Id>
+  RDSOracleEngine:
+    Description: Oracle RDS Engine Version
+    Default: oracle-se2
+    Type: String
+  RDSOracleEngineVersion:
+    Description: RDS Oracle Engine version
+    Default: 12.1.0.2.v6
+    Type: String
+  RDSOracleDBInstanceIdentifier:
+    Description: RDS Oracle Database Instance Identifier
+    Type: String
+    Default: amzdbedht01
+  RDSOracleDBInstanceClass:
+    Description: The Oracle RDS instance type.
+    Type: String
+    Default: db.m4.large
+    ConstraintDescription: must select a valid database instance type.
+  RDSOracleMultiAZ:
+    Description: MultiAZ option check for the Oracle RDS instance
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  RDSOracleStorageType:
+    Description: The storage type associated with this OracleDB instance.
+    Default: 'gp2'
+    Type: String
+  RDSOracleAllocatedStorage:
+    Description: Allocate Storage in (GiB) for Oracle RDS
+    Type: String
+    MinLength: '1'
+    MaxLength: '5'    
+    Default: 50
+  RDSOracleOptionGroupName:
+    Description: Option Group Details for Oracle RDS
+    Default: default:oracle-se2-12-1
+    Type: String
+  RDSOracleMasterUsername:
+    Description: Oracle RDS Masteruser Name for DB login
+    Type: String
+    Default: oracle
+  RDSOracleStorageEncrypted:
+    Description: RDS OracleDB instance encryption
+    Type: String
+    Default: 'true'
+    AllowedValues:
+      - 'true'
+      - 'false'
+  RDSPreferredMaintenanceWindow:  
+    Description: The weekly time range during which system maintenance can occur.
+    Type: 'String'
+    Default: 'sun:07:00-sun:08:00' 
+  RDSPreferredBackupWindow:
+    Description: The daily time range during which automated backups are performed.
+    Type: 'String'
+    Default: '04:00-05:00'
+  RDSBackupRetentionPeriod:
+    Description: The number of days the automated snapshots needs to be retained.
+    Type: 'String'
+    MinLength: 1
+    MaxLength: 3
+    Default: '20'
+  RDSAutoMinorVersionUpgrade:
+    Type: String
+    Description: Indicates the minor engine upgrades are applied automatically to the DB instance during the maintenance window.
+    AllowedValues:
+      - true
+      - false  
+    Default: false 
+  RDSOracleLicenseModel:
+    Type: String
+    Description: LicenseModel for the Oracle RDS
+    AllowedValues:
+     - license-included
+     - bring-your-own-license
+    Default: license-included 
+  RDSOraclePort:
+    Type: String
+    Description: Oracle RDS Port Number
+    Default: 1521 
+  RDSOracleDBName:
+    Description: The name of the first database to be created.
+    Type: String
+    Default: ORACL1
+  EDHOracleRDUserPasswordPSName:
+    Type: AWS::SSM::Parameter::Name 
+    Description: Parameter Store Name for the Oracle RDS Master user Password
+  EDHOracleRDUserPasswordPSNameVersion:
+    Type: Number
+    Description: Parameter Store Version for the Oracle RDS Master user Password
+    Default: 1
+  EDHINFSubnetCIDR:
+    Description: INF Subnet CIDR
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.104.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.    
+  EDHEMRSubnetCIDR:
+    Description: EMR Subnet CIDR
+    Type: String
+    MinLength: '9'
+    MaxLength: '18'
+    Default: '10.193.100.0/24'
+    AllowedPattern: '(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})/(\d{1,2})'
+    ConstraintDescription: must be a valid IP CIDR range of the form x.x.x.x/x.  
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value 
+Conditions: 
+  OracleRDSEncrypteDB: !Equals 
+    - !Ref RDSOracleStorageEncrypted
+    - 'true'        
+Mappings:    
+  NameMap: 
+    PROD: 
+      lowecase: "prod"
+    TEST: 
+      lowecase: "test"
+    STG: 
+      lowecase: "stg"
+    DEV: 
+      lowecase: "dev"  
+    QA: 
+      lowecase: "qa"        
+Resources:
+  RDSOracleDBInstanceEncryptionKey:
+    Type: AWS::KMS::Key
+    Condition: OracleRDSEncrypteDB
+    Properties:
+      Description: !Sub EDH-TCO-RDSOracle-${Env}
+      Enabled: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+          - Sid: Allow access for Key Administrators
+            Effect: Allow
+            Principal: '*'
+            Action:
+              - 'kms:Create*'
+              - 'kms:Describe*'
+              - 'kms:Enable*'
+              - 'kms:List*'
+              - 'kms:Put*'
+              - 'kms:Update*'
+              - 'kms:Revoke*'
+              - 'kms:Disable*'
+              - 'kms:Get*'
+              - 'kms:Delete*'
+              - 'kms:TagResource'
+              - 'kms:UntagResource'
+              - 'kms:ScheduleKeyDeletion'
+              - 'kms:CancelKeyDeletion'
+            Resource: '*'
+          - Sid: Allow use of the key
+            Effect: Allow
+            Principal: '*'            
+            Action:
+              - 'kms:Encrypt'
+              - 'kms:Decrypt'
+              - 'kms:ReEncrypt*'
+              - 'kms:GenerateDataKey*'
+              - 'kms:DescribeKey'
+            Resource: '*'
+          - Sid: Allow attachment of persistent resources
+            Effect: Allow
+            Principal: '*' 
+            Action:
+              - 'kms:CreateGrant'
+              - 'kms:ListGrants'
+              - 'kms:RevokeGrant'
+            Resource: '*'
+            Condition:
+              Bool:
+                'kms:GrantIsForAWSResource': 'true'            
+      Tags:
+        - Key: Name
+          Value: !Sub EDH-TCO-Oracle-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  RDSOracleDBInstanceEncryptionAlias:
+    Type: AWS::KMS::Alias
+    Condition: OracleRDSEncrypteDB
+    Properties:
+      AliasName: !Sub alias/EDH-TCO-Oracle-${Env}
+      TargetKeyId: !Ref RDSOracleDBInstanceEncryptionKey                      
+  RDSOracleDBSecurityGroups:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      VpcId: !Ref RDSOracleVPCID
+      GroupName: !Sub EDH-${Env}-ORA
+      GroupDescription: Production Oracle RDS Security Group
+      SecurityGroupIngress:
+        - CidrIp: !Ref EDHINFSubnetCIDR
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521
+        - CidrIp: 172.16.0.0/12
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521
+        - CidrIp: 10.255.0.0/16
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521          
+        - CidrIp: 10.192.11.196/32
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521
+        - CidrIp: !Ref EDHEMRSubnetCIDR
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521           
+        - CidrIp: 10.160.0.0/16 
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521           
+        - CidrIp: 172.28.26.244/32
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521 
+        - CidrIp: 172.28.26.245/32
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521           
+        - CidrIp: 172.28.26.246/32
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521 
+        - CidrIp: 172.28.26.247/32
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521 
+        - CidrIp: 172.28.26.248/32
+          IpProtocol: tcp
+          FromPort: 1521
+          ToPort: 1521                                                    
+      Tags:
+        - Key: Name
+          Value: !Sub EDH-${Env}-ORACLE
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue       
+  RDSDBParameterGroup:
+    Type: AWS::RDS::DBParameterGroup
+    Properties:
+      Description: parameter group for oracle-se2-12.1
+      Family: oracle-se2-12.1
+      Parameters:
+         open_cursors: 5000
+      Tags:
+        - Key: Name
+          Value: !Join
+          - ''
+          - - 'oracl1-parameter-'
+            - !FindInMap
+              - NameMap
+              - !Ref 'Env'
+              - lowecase
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+  RDSOracleDBSubnetGroupName:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: !Sub ${Env}-EDH-TCO-INF-OracleDB-SG
+      SubnetIds: !Ref RDSSubnetId
+      Tags:
+        - Key: Name
+          Value: !Join
+          - ''
+          - - !FindInMap
+              - NameMap
+              - !Ref 'Env'
+              - lowecase
+            - '-edh-tco-inf-oracledb-sg'
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue    
+  RDSOracleDBInstance:
+    DependsOn:
+      - RDSOracleDBSubnetGroupName
+      - RDSOracleDBSecurityGroups
+      - RDSDBParameterGroup
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref RDSOracleDBName
+      AllocatedStorage: !Ref RDSOracleAllocatedStorage   
+      DBInstanceClass: !Ref RDSOracleDBInstanceClass
+      Engine: !Ref RDSOracleEngine
+      AutoMinorVersionUpgrade: !Ref RDSAutoMinorVersionUpgrade
+      EngineVersion: !Ref RDSOracleEngineVersion
+      LicenseModel: !Ref RDSOracleLicenseModel
+      CharacterSetName: AL32UTF8
+      MasterUsername: !Ref RDSOracleMasterUsername
+      MasterUserPassword: !Sub '{{resolve:ssm:${EDHOracleRDUserPasswordPSName}:${EDHOracleRDUserPasswordPSNameVersion}}}'
+      DBInstanceIdentifier: !Ref RDSOracleDBInstanceIdentifier
+      BackupRetentionPeriod: !Ref RDSBackupRetentionPeriod
+      CopyTagsToSnapshot: true
+      PreferredBackupWindow: !Ref RDSPreferredBackupWindow
+      PreferredMaintenanceWindow: !Ref RDSPreferredMaintenanceWindow
+      DeleteAutomatedBackups: false       
+      VPCSecurityGroups:
+        - !Ref RDSOracleDBSecurityGroups
+      DBSubnetGroupName: !Ref RDSOracleDBSubnetGroupName
+      DBParameterGroupName: !Ref RDSDBParameterGroup
+      MultiAZ: !Ref RDSOracleMultiAZ
+      OptionGroupName: !Ref RDSOracleOptionGroupName 
+      StorageEncrypted: !Ref RDSOracleStorageEncrypted
+      StorageType: !Ref RDSOracleStorageType   
+      Port: !Ref RDSOraclePort
+      Tags:
+        - Key: Name
+          Value: !Sub RDSOracle-${Env}
+        - Key: Env
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue            
+      KmsKeyId: !If 
+        - OracleRDSEncrypteDB
+        - !Ref RDSOracleDBInstanceEncryptionKey
+        - !Ref 'AWS::NoValue'
+Outputs:
+  OracleJDBCConnectionString:
+    Description: JDBC connection string for the database
+    Value: !Join ['', ['jdbc:Oracle://', !GetAtt [RDSOracleDBInstance, Endpoint.Address], ':', !GetAtt [RDSOracleDBInstance, Endpoint.Port], /, !Ref 'RDSOracleDBName']]
+  OracleEndpointAddress:
+    Description: Oracle DB Endpoint Address
+    Value: !GetAtt RDSOracleDBInstance.Endpoint.Address
+  RDSOracleInstanceName:
+    Description: Name of the DB Instance
+    Value:
+      Ref: RDSOracleDBInstance
+  RDSOracleParameterGroupName:
+    Description: Name of parameter group
+    Value:
+      Ref: RDSDBParameterGroup
+  RDSOracleSubnetGroupName:
+    Description: Name of cluster subnet group
+    Value:
+      Ref: RDSOracleDBSubnetGroupName   
+  RDSOracleDBSecurityGroupsID:
+    Description: Oracle RDS SecurityGroup ID    
+    Value: !GetAtt RDSOracleDBSecurityGroups.GroupId         

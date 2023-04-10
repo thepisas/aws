@@ -1,0 +1,735 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  AWS CloudFormation template deploys a EDH Informatica BDM instnace with the required IAM permissions and network configurations.
+Parameters:
+  TimeZone:
+    Type: String
+    Description: Timezone in which instance needs to be set.
+    Default: America/New_York
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH
+  S3EDHMessageRAWBucketName:
+    Type: String
+    Description: Name of the bucket to store the RAW Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrawtest
+  S3EDHPKGBucketName:
+    Type: String
+    Description: Name of the bucket which EDH package details
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhpkgtest
+  S3EDHMessageRefinedBucketName:
+    Type: String
+    Description: Name of the bucket to store the Redfined Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrefinedprod
+  S3EDHSSMBucketName:
+    Type: String
+    Description: Name of the bucket to Store SSM Parameters
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3testssm
+  S3EDHScriptsBucketName:
+    Type: String
+    Description: Name of the bucket where the automation scripts are uploaded.
+  ESSSMParameterName:
+    Type: String
+    Description: SSM Parameters Store Name to access the values
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType:
+    Description: EDH Informatica BDM
+    Type: String
+    Default: m4.large
+    ConstraintDescription: must be a valid EC2 instance type.
+  ServerName:
+    Type: String
+    Description: EC2 Instance Name
+    Default: AMZLINEDHT01
+  EDHSubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: The ID of the subnet to associate with the network interface.
+  EDHBucketName:
+    Type: String
+    Description: Name of the EDH Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhtest
+  EDHAdobeAnalyticsBucketName:
+    Type: String
+    Description: Name of the EDH Adobe Analytics Bucket
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3adobeanalyticstest
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG
+  ImageId:
+    Type: 'String'
+    Description: The unique ID of the Amazon Machine Image (AMI) that was assigned during registration.
+  EDHSecurityGroups:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: A list that contains the security group IDs for VPC security groups to assign to the Amazon EC2 instance
+  EDHRootVolumeSize:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 128
+  EDHRootVolumeType:
+    Type: String
+    Description: Select the volume type for the Root volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: gp2
+  EDHAttachedVolume1Size:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 500
+  EDHAttachedVolume1Type:
+    Type: String
+    Description: Select the volume type for the volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: gp2
+  EDHAttachedVolume2Size:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 1600
+  EDHAttachedVolume2Type:
+    Type: String
+    Description: Select the volume type for the volume.
+    AllowedValues:
+      - standard
+      - gp2
+      - sc1
+      - st1
+    Default: st1
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value
+  EDHUsersList:
+    Type: String
+    Description: Linux User Account for Informatica BDM Server.
+    Default: 'adatta,csett,skarmaka,droglier,nirchoud,mkundu,negupta,rprakash,sbanerje,vreddy, tsurekha,sbhooshi,sbhooshi,pujeyara,smuthusa,lsahoo,speddapa,rgalanna,mcuser'
+Mappings:
+  NameMap:
+    PROD:
+      lowecase: "prod"
+    TEST:
+      lowecase: "test"
+    STG:
+      lowecase: "stg"
+    DEV:
+      lowecase: "dev"
+    QA:
+      lowecase: "qa"
+  CamelCaseMap:
+    PROD:
+      lowecase: "Prod"
+    TEST:
+      lowecase: "Test"
+    STG:
+      lowecase: "Stg"
+    DEV:
+      lowecase: "Dev"
+    QA:
+      lowecase: "Qa"
+Resources:
+  EDHRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: !Sub ${ServerName}_S3_Access
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess'
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - 'sts:AssumeRole'
+      Path: /
+  EDHRolePolicies:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Join
+        - ''
+        - - 'EC2_'
+          - !FindInMap
+            - CamelCaseMap
+            - !Ref 'Env'
+            - lowecase
+          - S3Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action: 's3:*'
+            Resource:
+              - "arn:aws:s3:::amzs3edhdev"
+              - "arn:aws:s3:::amzs3edhdev/*"
+              - "arn:aws:s3:::amzs3edhtest"
+              - "arn:aws:s3:::amzs3edhtest/*"
+              - "arn:aws:s3:::amzs3edhqa"
+              - "arn:aws:s3:::amzs3edhqa/*"
+              - "arn:aws:s3:::amzs3edhpkg"
+              - "arn:aws:s3:::amzs3edhpkg/*"
+              - !Sub arn:aws:s3:::${EDHAdobeAnalyticsBucketName}
+              - !Sub arn:aws:s3:::${EDHAdobeAnalyticsBucketName}/*
+              - !Sub arn:aws:s3:::${EDHBucketName}
+              - !Sub arn:aws:s3:::${EDHBucketName}/*
+              - !Sub arn:aws:s3:::${S3EDHMessageRAWBucketName}
+              - !Sub arn:aws:s3:::${S3EDHMessageRAWBucketName}/*
+              - !Sub arn:aws:s3:::${S3EDHMessageRefinedBucketName}
+              - !Sub arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*
+              - !Sub arn:aws:s3:::${S3EDHPKGBucketName}
+              - !Sub arn:aws:s3:::${S3EDHPKGBucketName}/*
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'
+      Roles:
+        - !Ref EDHRole
+  EDHS3AccessRolePolicies:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Join
+        - ''
+        - - !Ref 'EDHAdobeAnalyticsBucketName'
+          - '_s3_access_'
+          - !FindInMap
+            - CamelCaseMap
+            - !Ref 'Env'
+            - lowecase
+          - Policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: S3BucketPermissions
+            Effect: Allow
+            Action:
+              - 's3:GetLifecycleConfiguration'
+              - 's3:ListBucketByTags'
+              - 's3:GetBucketTagging'
+              - 's3:GetInventoryConfiguration'
+              - 's3:GetObjectVersionTagging'
+              - 's3:GetBucketLogging'
+              - 's3:ListBucketVersions'
+              - 's3:GetAccelerateConfiguration'
+              - 's3:ListBucket'
+              - 's3:GetBucketPolicy'
+              - 's3:GetEncryptionConfiguration'
+              - 's3:GetObjectAcl'
+              - 's3:GetObjectVersionTorrent'
+              - 's3:GetBucketRequestPayment'
+              - 's3:GetObjectVersionAcl'
+              - 's3:GetObjectTagging'
+              - 's3:GetMetricsConfiguration'
+              - 's3:GetIpConfiguration'
+              - 's3:ListBucketMultipartUploads'
+              - 's3:GetBucketWebsite'
+              - 's3:GetBucketVersioning'
+              - 's3:GetBucketAcl'
+              - 's3:GetBucketNotification'
+              - 's3:GetReplicationConfiguration'
+              - 's3:ListMultipartUploadParts'
+              - 's3:GetObject'
+              - 's3:GetObjectTorrent'
+              - 's3:GetBucketCORS'
+              - 's3:GetAnalyticsConfiguration'
+              - 's3:GetObjectVersionForReplication'
+              - 's3:GetBucketLocation'
+              - 's3:GetObjectVersion'
+            Resource:
+              - !Sub arn:aws:s3:::${EDHAdobeAnalyticsBucketName}
+          - Sid: S3ListPermissions
+            Effect: Allow
+            Action:
+              - 's3:ListAllMyBuckets'
+              - 's3:HeadBucket'
+            Resource: '*'
+      Roles:
+        - !Ref EDHRole
+  EDHSSMRolePolicies:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: !Sub TCO_SSM_Policy_For_INF_EC2_${Env}
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Action:
+            - 'ssm:DescribeAssociation'
+            - 'ssm:GetDeployablePatchSnapshotForInstance'
+            - 'ssm:GetDocument'
+            - 'ssm:GetManifest'
+            - 'ssm:ListAssociations'
+            - 'ssm:ListInstanceAssociations'
+            - 'ssm:PutInventory'
+            - 'ssm:PutComplianceItems'
+            - 'ssm:PutConfigurePackageResult'
+            - 'ssm:UpdateAssociationStatus'
+            - 'ssm:UpdateInstanceAssociationStatus'
+            - 'ssm:UpdateInstanceInformation'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'ssm:DescribeParameters'
+            - 'ssm:PutParameter'
+            - 'ssm:GetParameters'
+            - 'ssm:GetParameter'
+            - 'ssm:DeleteParameter'
+          Resource:
+            - !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ESSSMParameterName}
+        - Effect: Allow
+          Action:
+            - 'ec2messages:AcknowledgeMessage'
+            - 'ec2messages:DeleteMessage'
+            - 'ec2messages:FailMessage'
+            - 'ec2messages:GetEndpoint'
+            - 'ec2messages:GetMessages'
+            - 'ec2messages:SendReply'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'cloudwatch:PutMetricData'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'ec2:DescribeInstanceStatus'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'ds:CreateComputer'
+            - 'ds:DescribeDirectories'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 'logs:CreateLogGroup'
+            - 'logs:CreateLogStream'
+            - 'logs:DescribeLogGroups'
+            - 'logs:DescribeLogStreams'
+            - 'logs:PutLogEvents'
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - 's3:PutObject'
+            - 's3:GetObject'
+            - 's3:AbortMultipartUpload'
+            - 's3:ListMultipartUploadParts'
+            - 's3:ListBucket'
+            - 's3:ListBucketMultipartUploads'
+          Resource:
+              - !Sub arn:aws:s3:::${S3EDHSSMBucketName}
+              - !Sub arn:aws:s3:::${S3EDHSSMBucketName}/*
+      Roles:
+        - !Ref EDHRole
+  EDHInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - !Ref EDHRole
+  EDHServer:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !Ref ImageId
+      BlockDeviceMappings:
+      - DeviceName: /dev/sda1
+        Ebs:
+          DeleteOnTermination: true
+          Encrypted: true
+          VolumeSize: !Ref EDHRootVolumeSize
+          VolumeType: !Ref EDHRootVolumeType
+      InstanceType: !Ref InstanceType
+      SecurityGroupIds: !Ref EDHSecurityGroups
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref EDHInstanceProfile
+      SubnetId: !Ref EDHSubnetId
+      EbsOptimized: true
+      SourceDestCheck: true
+      UserData:
+        Fn::Base64:
+          !Sub |
+            Content-Type: multipart/mixed; boundary="//"
+            MIME-Version: 1.0
+
+            --//
+            Content-Type: text/cloud-config; charset="us-ascii"
+            MIME-Version: 1.0
+            Content-Transfer-Encoding: 7bit
+            Content-Disposition: attachment; filename="cloud-config.txt"
+            #cloud-config
+            cloud_final_modules:
+            - [scripts-user, always]
+
+            --//
+            Content-Type: text/x-shellscript; charset="us-ascii"
+            MIME-Version: 1.0
+            Content-Transfer-Encoding: 7bit
+            Content-Disposition: attachment; filename="userdata.txt"
+
+            #!/bin/bash -xe
+            exec > >(tee /var/tmp/userdata.log|logger -t userdata ) 2>&1
+
+            # PRE-REQUISITE INSTALLATION
+            cd /tmp
+            sudo yum install -y wget dos2unix
+
+            group=edhgroup
+            if grep -q $group /etc/group
+            then
+              echo "group exists"
+            else
+              groupadd -g 598 edhgroup
+              useradd -u 997 -g 598 -c "edhgroup user" -s /sbin/nologin -M edhgroup
+              chage -I -1 -m 0 -M 99999 -E -1 edhgroup
+            fi
+
+            # INSTALLATION OF PACKAGES.
+            FILE=/var/tmp/EDHGenericPckgInstalled
+            if [ -f "$FILE" ]; then
+              echo "$FILE exist, no need to install packages again"
+            else
+              # Set Timezone
+              timedatectl set-timezone ${TimeZone}
+
+              cd /tmp
+              yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+              yum update -y
+              yum install zip unzip bind-utils traceroute lvm2 wget -y
+              yum install nvme-cli -y
+
+              #Install AWS CLI
+              cd /tmp
+              curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+              unzip awscli-bundle.zip
+              ./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+              rm ./awscli-bundle.zip
+              rm -rf ./awscli-bundle
+
+              touch /var/tmp/EDHGenericPckgInstalled
+            fi
+
+            # Set Hostname
+            region=$(curl --silent http://169.254.169.254/latest/dynamic/instance-identity/document | grep region | awk -F\" '{print $(NF-1)}')
+            ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
+            host_name=$(/usr/local/bin/aws ec2 --region "$region" describe-tags --filters Name=resource-id,Values="$ec2_instance_id" Name=key,Values=Name --query Tags[].Value --output text)
+            hostnamectl set-hostname "$host_name"
+            hostnamectl status
+            #To persist the change
+            echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
+
+            # USER AND GROUP CONFIGURATION - OS, edhgroup.
+            #create users with root privs
+            count0=0
+            for i in apathros ; do
+              if [ -z "$(getent passwd $i)" ]; then
+                echo "user $i does NOT exist."
+                useradd -m -G ssh_access $i
+                user_created=$(id -u $i > /dev/null 2>&1; echo $?)
+                  if [ $user_created -eq 0 ]; then
+                    mkdir -p /home/$i/.ssh
+                    touch /home/$i/.ssh/authorized_keys
+                    chown -R $i:$i /home/$i/.ssh
+                    chmod 700 /home/$i/.ssh
+                    chmod 600 /home/$i/.ssh/authorized_keys
+                    #echo "$i ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+                    echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key" >> /home/apathros/.ssh/authorized_keys
+
+                    chage -I -1 -m 0 -M 99999 -E -1 $i
+                    count0=1
+                  fi
+              else
+                echo "user $i does exist."
+              fi
+            done
+
+            ADMINS=apathros
+            #creation of  the  Linux user-accounts with a temporary password.
+            user_accounts=${EDHUsersList}
+            IFS=,
+            field_separator=$IFS
+
+            count1=0
+            for i in $user_accounts; do
+              if [ -z "$(getent passwd $i)" ]; then
+                echo "user $i does NOT exist."
+                useradd -m -G ssh_access,edhgroup $i
+                echo "$i:T!emp123" | chpasswd
+                passwd -e $i
+                ADMINS="$ADMINS,$i"
+                count1=1
+              else
+                echo "user $i exist."
+              fi
+            done
+
+            host_name=$(hostname -s)
+            echo "hostname set is $host_name"
+            if [ ${Env} == "PROD" ]; then
+              srvcAcntName=nsvc_pmcmd_prod
+              label=$host_name
+            else
+              if [ ${Env} == "TEST" ]; then
+                srvcAcntName=nsvc_pmcmd_test
+                label=$host_name
+              else
+                if [ ${Env} == "STG" ]; then
+                  srvcAcntName=nsvc_pmcmd_stg
+                  label=$host_name
+                else
+                  if [ ${Env} == "DEV" ]; then
+                    srvcAcntName=nsvc_pmcmd_dev
+                    label=$host_name
+                  else
+                    if [ ${Env} == "QA" ]; then
+                      srvcAcntName=nsvc_pmcmd_qa
+                      label=$host_name
+                    fi
+                  fi
+                fi
+              fi
+            fi
+
+
+            if [ $count0 -eq 1 -o $count1 -eq 1 ]; then
+              IFS=$field_separator
+              echo -e "\nUser_Alias INFORMATICA=infoadmin,$user_accounts,apathros" >> /etc/sudoers
+              echo -e "\nINFORMATICA     ALL=(infoadmin)  NOPASSWD: ALL" >> /etc/sudoers
+
+              echo -e "\n # Added For Control-M Informatica Job Workflows" >> /etc/sudoers
+              echo -e "\n$srvcAcntName  ALL=(infoadmin) NOPASSWD: /app/infasetup/source/server/bin/pmcmd, /app/informatica/v1011/server/bin/infacmd.sh" >> /etc/sudoers
+            fi
+
+            #operations pertaining to the /app filesystem
+            mkdir /datafiles
+            mkdir /app
+            app_device=`lsblk | awk '{print $1}'| tail -1`
+            if [ "$app_device" = "xvdf" ]; then
+
+              vgcreate DataVol /dev/sdf
+              lvcreate -l 90%FREE -n Data DataVol
+              lvcreate -l 10%FREE -n App DataVol
+              mkfs.ext4 /dev/DataVol/Data
+              mkfs.ext4 /dev/DataVol/App
+              mount /dev/DataVol/Data /datafiles
+              mount /dev/DataVol/App  /app
+
+              e2label /dev/"$app_device" $label
+              immutable=`lsattr /etc/fstab | awk -F- '{print $5}'`
+              if [ "$immutable" = "i" ]; then chattr -i /etc/fstab ; fi
+              lsattr /etc/fstab
+              echo "LABEL=$label /datafiles ext4 noatime,rw 1 2" >> /etc/fstab
+              echo "LABEL=$label /app ext4 noatime,rw 1 2" >> /etc/fstab
+              chown -R edhgroup.$srvcAcntName /datafiles
+              chown -R edhgroup.$srvcAcntName /app
+            else
+              echo -e "The app device/volume is "$app_device" when the expected value was xvdf. So the filesystem and label were not created on it."
+            fi
+
+            mkdir /landingzone
+            app_device=`lsblk | awk '{print $1}'| tail -1`
+            if [ "$app_device" = "xvdg" ]; then
+
+              vgcreate LandingZoneVol /dev/sdg
+              lvcreate -l 100%FREE -n LandingZone LandingZoneVol
+              mkfs.ext4 /dev/LandingZoneVol/LandingZone
+              mount /dev/LandingZoneVol/LandingZone /landingzone
+
+              e2label /dev/"$app_device" $label
+              immutable=`lsattr /etc/fstab | awk -F- '{print $5}'`
+              if [ "$immutable" = "i" ]; then chattr -i /etc/fstab ; fi
+              lsattr /etc/fstab
+              echo "LABEL=$label /landingzone ext4 noatime,rw 1 2" >> /etc/fstab
+              chown -R edhgroup.$srvcAcntName /landingzone
+            else
+              echo -e "The app device/volume is "$app_device" when the expected value was xvdg. So the filesystem and label were not created on it."
+            fi
+
+            FILE=/var/tmp/EDHINFDwnldS3Files
+            if [ -f "$FILE" ]; then
+              echo "$FILE exist, no need to download files from S3 bucket.
+            else
+              bucketName=${S3EDHScriptsBucketName}
+
+              mkdir -p /app/edh
+              aws s3 cp s3://$bucketName/bdm/wave0/ShellScripts/app-edh/ /app/edh --recursive
+
+              mkdir -p /datafiles/infadata/edh/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/wave0/ParamFiles/ /datafiles/infadata/edh/ParamFiles/ --recursive
+
+              mkdir -p /datafiles/infadata/edh/scripts/
+              aws s3 cp s3://$bucketName/bdm/wave0/ShellScripts/datafiles-infadata-edh-scripts/ /datafiles/infadata/edh/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/edh/sql/
+              aws s3 cp s3://$bucketName/bdm/wave0/SQLScripts/ /datafiles/infadata/edh/sql/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/chnlmap/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/napac/cm/Params/ /datafiles/infadata/rf/chnlmap/ParamFiles/  --recursive
+
+              mkdir -p /datafiles/infadata/rf/chnlmap/scripts/
+              aws s3 cp s3://$bucketName/bdm/napac/cm/ShellScripts/ /datafiles/infadata/rf/chnlmap/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/chnlmap/sql/
+              aws s3 cp s3://$bucketName/bdm/napac/cm/SQLScripts/ /datafiles/infadata/rf/chnlmap/sql/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/curr_rate/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/napac/cr/Parameter_Files/datafiles-infadata-rf-curr_rate-ParamFiles/ /datafiles/infadata/rf/curr_rate/ParamFiles/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/curr_rate/scripts/
+              aws s3 cp s3://$bucketName/bdm/napac/cr/ShellScripts/ /datafiles/infadata/rf/curr_rate/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/curr_rate/sql/
+              aws s3 cp s3://$bucketName/bdm/napac/cr/SQLScripts/ /datafiles/infadata/rf/curr_rate/sql/  --recursive
+
+              mkdir -p /datafiles/infadata/rf/invrec/ParamFiles
+              aws s3 cp s3://$bucketName/bdm/napac/ir/Params/datafiles-infadata-rf-invrec-ParamFiles/ /datafiles/infadata/rf/invrec/ParamFiles --recursive
+
+              mkdir -p /datafiles/infadata/rf/invrec/scripts/
+              aws s3 cp s3://$bucketName/bdm/napac/ir/ShellScripts/ /datafiles/infadata/rf/invrec/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/invrec/sql/
+              aws s3 cp s3://$bucketName/bdm/napac/ir/SQLScripts/ /datafiles/infadata/rf/invrec/sql/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/invtran/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/napac/invt/Parameter_Files/datafiles-infadata-rf-invtran-ParamFiles/ /datafiles/infadata/rf/invtran/ParamFiles/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/invtran/scripts/
+              aws s3 cp s3://$bucketName/bdm/napac/invt/ShellScripts/datafiles-infadata-rf-invtran-scripts/ /datafiles/infadata/rf/invtran/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/invtran/sql/
+              aws s3 cp s3://$bucketName/bdm/napac/invt/SQLScripts/datafiles-infadata-rf-invtran-sql/ /datafiles/infadata/rf/invtran/sql/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/order_details/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/napac/od/Parameter_Files/ /datafiles/infadata/rf/order_details/ParamFiles/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/order_details/scripts/
+              aws s3 cp s3://$bucketName/bdm/napac/od/ShellScripts/datafiles-infadata-rf-order_details-scripts/ /datafiles/infadata/rf/order_details/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/rf/order_details/sql/
+              aws s3 cp s3://$bucketName/bdm/napac/od/SQLScripts/ /datafiles/infadata/rf/order_details/sql/ --recursive
+
+              mkdir -p /datafiles/infadata/cd100/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/cd100/Params/ /datafiles/infadata/cd100/ParamFiles/ --recursive
+
+              mkdir -p /datafiles/infadata/cd100/scripts/
+              aws s3 cp s3://$bucketName/bdm/cd100/ShellScripts/ /datafiles/infadata/cd100/scripts/ --recursive
+
+              mkdir -p /datafiles/infadata/cd100/sql/
+              aws s3 cp s3://$bucketName/bdm/cd100/SQLScripts/ /datafiles/infadata/cd100/sql/ --recursive
+
+              mkdir -p /datafiles/infadata/Korea_Trade/ParamFiles/
+              aws s3 cp s3://$bucketName/bdm/kt/Params/ /datafiles/infadata/Korea_Trade/ParamFiles/ --recursive
+
+              mkdir -p /datafiles/infadata/Korea_Trade/scripts
+              aws s3 cp s3://$bucketName/bdm/kt/ShelLScripts/ /datafiles/infadata/Korea_Trade/scripts/ --recursive
+
+              # Update files, having redshift_server to get value of redhsift server.
+              grep -rl 'jdbc:redshift://stg' ./ | xargs sed -i 's+jdbc:redshift://stg+$redshift_server+g'
+
+              mkdir -p /controlm/software
+              aws s3 cp s3://$bucketName/controlm/software/ /controlm/software/ --recursive
+
+              #S3 Files are downloaded.
+              touch /var/tmp/EDHINFDwnldS3Files
+            fi
+            --//
+      Tags:
+        - Key: Name
+          Value: !Ref ServerName
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHEBSVolume1:
+    Type: AWS::EC2::Volume
+    DependsOn:
+      - EDHServer
+    Properties:
+      AutoEnableIO: true
+      AvailabilityZone: !GetAtt EDHServer.AvailabilityZone
+      Encrypted: true
+      Size: !Ref EDHAttachedVolume1Size
+      VolumeType: !Ref EDHAttachedVolume1Type
+      Tags:
+        - Key: Name
+          Value: !Sub ${ServerName}/volume1
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHEBSVolume2:
+    Type: AWS::EC2::Volume
+    DependsOn:
+      - EDHServer
+    Properties:
+      AutoEnableIO: true
+      AvailabilityZone: !GetAtt EDHServer.AvailabilityZone
+      Encrypted: true
+      Size: !Ref EDHAttachedVolume2Size
+      VolumeType: !Ref EDHAttachedVolume2Type
+      Tags:
+        - Key: Name
+          Value: !Sub ${ServerName}/volume2
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue
+  EDHAttachVolume1:
+    DependsOn:
+      - EDHServer
+      - EDHEBSVolume1
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      Device: /dev/sdf
+      InstanceId: !Ref EDHServer
+      VolumeId: !Ref EDHEBSVolume1
+  EDHAttachVolume2:
+    Type: AWS::EC2::VolumeAttachment
+    DependsOn:
+      - EDHServer
+      - EDHAttachVolume1
+      - EDHEBSVolume1
+      - EDHEBSVolume2
+    Properties:
+      Device: /dev/sdg
+      InstanceId: !Ref EDHServer
+      VolumeId: !Ref EDHEBSVolume2
+Outputs:
+  EDHServerID:
+    Value: !Ref EDHServer
+    Description: Informatica BDM Instance Id
+  EDHServerPrivateIP:
+    Value: !GetAtt EDHServer.PrivateIp
+    Description: Informatica BDM Instance Private IP
+  EDHEBSVolume1ID:
+    Value: !Ref EDHEBSVolume1
+    Description: Informatica BDM VolumeId
+  EDHEBSVolume2ID:
+    Value: !Ref EDHEBSVolume2
+    Description: Informatica BDM VolumeId

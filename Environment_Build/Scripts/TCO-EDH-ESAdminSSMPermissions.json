@@ -1,0 +1,22 @@
+{
+    "Version": "2012-10-17",
+	
+	 "Statement": [
+        {
+            "Sid": "ESAdmins",
+			"Effect": "Allow",
+            "Action": [
+                "ssm:DescribeParameters"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:GetParameters"
+            ],
+            "Resource": ["arn:aws:ssm:us-east-1:276654360894:parameter/ElasticSearch_DefaultSuperUserName_Stg", "arn:aws:ssm:us-east-1:276654360894:parameter/ElasticSearch_DefaultSuperUserPassword_Stg", 
+						"arn:aws:ssm:us-east-1:276654360894:parameter/ElasticSearch_LambdaESUserPassword_Stg", "arn:aws:ssm:us-east-1:276654360894:parameter/ElasticSearch_LDAPBindPassword_Stg"]
+        }
+    ]
+}

@@ -1,0 +1,310 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  The third stack which triggers the two nested stacks such as ECS Cluster for POS and ECS Cluster for Korea Trade to bring up the ECS service and Task execution. 
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:                       
+      - Label:
+          default: Cloudformation Template Configuration 
+        Parameters:
+            - CFTS3BucketName
+            - CFTS3KeyPrefix      
+      - Label:
+          default: Import Stack Configuration 
+        Parameters:
+            - EDHTCOMasterStack1                       
+Parameters:  
+  EDHPOSTaskDEF:
+    Default: 'Yes'
+    Description: Do we need a ECS POS Task Definition Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'           
+  EDHKTTaskDEF:
+    Default: 'Yes'
+    Description: Do we need a ECS Korea Trade Task Definition Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'      
+  Env:
+    Description: 'The type of Environment? ex: QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - QA
+      - DEV
+    Default: STG
+    ConstraintDescription: Should be at least 1 Character  
+  ECSPOSDesiredCount:
+    Type: Number
+    Default: '1'
+    Description: The number of tasks that you want to run on the cluster.    
+  ECSPOSContainerName:
+    Type: String
+    Default: bucketstorageapi
+    Description: The application name that the service will be deploying. 
+  ECSPOSImageTag:
+    Type: String
+    Default: latest
+    Description: The Tag value the task will use for getting the image from the ECR Repository.        
+  ECSPOSContainerCpu:
+    Description: The minimum number of CPU units to reserve for the container    
+    Type: Number
+    Default: 1024
+  ECSPOSContainerMemory:
+    Type: Number
+    Default: 512
+    Description: The hard limit (in MiB) of memory to present to the container. 
+  ECSPOSContainerPortNumber:
+    Type: Number
+    Default: 5000 
+    Description: The port number on the container bound to the host port     
+  ECSPOSContainerHostPort:
+    Type: Number
+    Default: '0'
+    Description: The host port number on the container instance                     
+  ECSKTWEBContainerName:
+    Type: String
+    Default: ktstg-web
+    Description: The application name that the service will be deploying. 
+  ECSKTWEBImageTag:
+    Type: String
+    Default: latest
+    Description: The Tag value the task will use for getting the image from the ECR Repository.    
+  ECSKTWEBMemoryReservation:
+    Type: Number
+    Default: 256
+    Description: The soft limit (in MiB) of memory to reserve for the container.      
+  ECSKTWEBContainerPortNumber:
+    Type: Number
+    Default: 80 
+    Description: The port number on the container bound to the host port.
+  ECSKTWEBContainerHostPort:
+    Type: Number
+    Default: '0'
+    Description: The host port number on the container instance.            
+  ECSKTWEBDesiredCount:
+    Type: Number
+    Default: '1'
+    Description: The number of tasks that you want to run on the cluster.                 
+  ECSKTAPPImageTag:
+    Type: String
+    Default: latest
+    Description: The Tag value the task will use for getting the image from the ECR Repository.
+  ECSKTAPPContainerName:
+    Type: String
+    Default: ktstg-app
+    Description: The application name that the service will be deploying.   
+  ECSKTAPPMemoryReservation:
+    Type: Number
+    Default: 256
+    Description: The soft limit (in MiB) of memory to reserve for the container.          
+  ECSKTAPPContainerPortNumber:
+    Type: Number
+    Default: 90 
+    Description: The port number on the container bound to the host port.     
+  ECSKTAPPContainerHostPort:
+    Type: Number
+    Default: '0'
+    Description: The host port number on the container instance.             
+  ECSKTAPPDesiredCount:
+    Type: Number
+    Default: '1'
+    Description: The number of tasks that you want to run on the cluster.               
+  ECSKTAPPDnsServer1:
+    Type: String     
+    Default: 172.16.124.81    
+    Description: A list of Dns servers that Amazon ECS provides to the container.
+  ECSKTAPPDnsServer2:
+    Type: String     
+    Default: 172.16.124.82  
+    Description: A list of Dns servers that Amazon ECS provides to the container. 
+  ECSKTAPPDnsSearchDomains:
+    Type: String
+    Default: tiffco.net   
+    Description: A list of DNS search domains that are provided to the container.                          
+  ECSLoggroupRetentionInDays:
+    Type: String
+    Default: 3653
+    Description: The number of days log events are kept in CloudWatch Logs (Possible values are 1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365, 400, 545, 731, 1827, and 3653)      
+  EDKKTRDSUserparameterstoreName:
+    Type: String
+    Default: 'KT_RDSStgUser'
+    Description: The Parameters Store Name that contains the korea Trade RDS user
+  EDKKTRDSUserPasswordparameterstoreName:
+    Type: String
+    Default: 'KT_RDSStgPassword'
+    Description: The Parameters Store Name that contains the korea Trade RDS user password 
+  EDHKMSKeyIDParameterStoreName:
+    Type: AWS::SSM::Parameter::Name
+    Description: KMS key ID used for the encrypting the Korea Trade RDS user and password.     
+  CFTS3BucketName:
+    AllowedPattern: '[a-z0-9-]*'
+    ConstraintDescription: CloudFormation bucket name can include numbers, lowercase
+      letters and hyphens (-). It cannot start or end with a hyphen
+      (-).
+    Description: S3 bucket name for the CloudFormation templates.
+    Type: String  
+  CFTS3KeyPrefix:
+    ConstraintDescription: Cloudformation key prefix can include numbers, lowercase letters,
+      uppercase letters, hyphens (-), and forward slash (/).
+    Description: S3 key prefix for the CloudFormation templates.
+    Type: String  
+  EDHTCOMasterStack1:
+    Description: >-
+      Name of an active CloudFormation stack that contains the infrastructure
+      resources, such as RDS, S3 Bucket, Redshift and Informatica Server.
+    Type: String  
+  EDHTCOMasterStack2:
+    Description: >-
+      Name of an active CloudFormation stack that contains the infrastructure
+      resources, such as ECS POS Cluster and ECS Korea Trade Cluster.
+    Type: String            
+Conditions:
+  S3KeyPrefix: !Not 
+    - !Equals 
+      - ''
+      - !Ref CFTS3KeyPrefix       
+  CreateEDHPOSTaskDEF: !Equals 
+    - !Ref EDHPOSTaskDEF
+    - 'Yes' 
+  CreateEDHKTTaskDEF: !Equals 
+    - !Ref EDHKTTaskDEF
+    - 'Yes'             
+Resources:     
+  EDHPOSTaskDEFStack:
+    Condition: CreateEDHPOSTaskDEF
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ECS-POS-TaskDefinition.yaml'
+      Parameters:
+        Env: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-Environment'            
+        ECSPOSClusterName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSPOSClusterName'           
+        ECSPOSELBTargetGroupArn:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSPOSTargetGroup'            
+        ECSPOSLoadBalancerArn:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSALB'            
+        ECSPOSDesiredCount: !Ref ECSPOSDesiredCount
+        ECSPOSContainerName: !Ref ECSPOSContainerName
+        ECSPOSRepositoryUri: !Join 
+              - ''
+              - - !Ref 'AWS::AccountId'
+                - '.dkr.ecr.'
+                - !Ref 'AWS::Region'
+                - '.amazonaws.com/'
+                - 'Fn::ImportValue':
+                    'Fn::Sub': '${EDHTCOMasterStack1}-EDHECRPOSRepository'
+        ECSPOSImageTag: !Ref ECSPOSImageTag
+        ECSPOSContainerCpu: !Ref ECSPOSContainerCpu
+        ECSPOSContainerMemory: !Ref ECSPOSContainerMemory
+        ECSPOSContainerPortNumber: !Ref ECSPOSContainerPortNumber
+        ECSPOSContainerHostPort: !Ref ECSPOSContainerHostPort
+        ECSPOSLoggroupRetentionInDays: !Ref ECSLoggroupRetentionInDays
+        S3EDHMessageRAWBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHMessagingRAWBucket'
+        S3EDHMessageErrorBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHMessagingErrorBucket'                   
+        S3EDHMessageRefinedBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHMessagingRefinedBucket'          
+        EDHBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHS3Bucket'
+        S3EDHTricklepollRawBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHTricklepollRawBucket'
+  EDHKTTaskDEFStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateEDHKTTaskDEF
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ECS-KT-TaskDefinition.yaml'
+      Parameters:
+        EDHKMSKeyIDParameterStoreName: !Ref EDHKMSKeyIDParameterStoreName
+        EDKKTRDSUserPasswordparameterstoreName: !Ref EDKKTRDSUserPasswordparameterstoreName
+        EDKKTRDSUserparameterstoreName: !Ref EDKKTRDSUserparameterstoreName
+        ECSKTWEBClusterName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSKTcluster'           
+        ECSKTWEBTargetGroupArn:  
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSKTWEBTargetGroup'            
+        ECSKTWEBContainerName: !Ref 'ECSKTWEBContainerName'
+        ECSKTWEBRepositoryUri: !Join 
+              - ''
+              - - !Ref 'AWS::AccountId'
+                - '.dkr.ecr.'
+                - !Ref 'AWS::Region'
+                - '.amazonaws.com/'
+                - 'Fn::ImportValue':
+                    'Fn::Sub': '${EDHTCOMasterStack1}-EDHECRKTWebRepository'
+        ECSKTWEBImageTag: !Ref ECSKTWEBImageTag
+        ECSKTWEBMemoryReservation: !Ref ECSKTWEBMemoryReservation
+        ECSKTWEBContainerPortNumber: !Ref ECSKTWEBContainerPortNumber
+        ECSKTWEBContainerHostPort: !Ref ECSKTWEBContainerHostPort
+        ECSKTWEBDesiredCount: !Ref ECSKTWEBDesiredCount
+        ECSKTWEBLoggroupRetentionInDays: !Ref ECSLoggroupRetentionInDays
+        ECSKTAPPClusterName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSKTcluster'           
+        ECSKTAPPTargetGroupArn:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack2}-ECSKTAPPTargetGroup'            
+        ECSKTAPPRepositoryUri: !Join 
+              - ''
+              - - !Ref 'AWS::AccountId'
+                - '.dkr.ecr.'
+                - !Ref 'AWS::Region'
+                - '.amazonaws.com/'
+                - 'Fn::ImportValue':
+                    'Fn::Sub': '${EDHTCOMasterStack1}-EDHECRKTAppRepository'
+        ECSKTAPPImageTag: !Ref ECSKTAPPImageTag
+        ECSKTAPPContainerName: !Ref ECSKTAPPContainerName
+        ECSKTAPPMemoryReservation: !Ref ECSKTAPPMemoryReservation
+        ECSKTAPPContainerPortNumber: !Ref ECSKTAPPContainerPortNumber
+        ECSKTAPPContainerHostPort: !Ref ECSKTAPPContainerHostPort
+        ECSKTAPPDesiredCount: !Ref ECSKTAPPDesiredCount
+        ECSKTAPPDnsServer1: !Ref ECSKTAPPDnsServer1
+        ECSKTAPPDnsServer2: !Ref ECSKTAPPDnsServer2
+        ECSKTAPPDnsSearchDomains: !Ref ECSKTAPPDnsSearchDomains
+        ECSKTAPPLoggroupRetentionInDays: !Ref ECSLoggroupRetentionInDays
+        Env: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-Environment'          
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack1}-EDHTCOTagValue'                                     

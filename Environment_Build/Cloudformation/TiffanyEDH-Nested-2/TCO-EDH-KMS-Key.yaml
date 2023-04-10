@@ -1,0 +1,65 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template to create the Lambda Function Encryption Key.
+Parameters:  
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG   
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH   
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value          
+Resources: 
+  EDHLAMBDAEncryptionAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: !Sub alias/LAMBDAKMS${Env}
+      TargetKeyId: !Ref EDHLAMBDAEncryptionKey                           
+  EDHLAMBDAEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: !Sub LambdaKMS-${Env}-Key
+      Enabled: true
+      KeyPolicy:
+        Version: 2012-10-17
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Join 
+                - ''
+                - - 'arn:aws:iam::'
+                  - !Ref 'AWS::AccountId'
+                  - ':root'
+            Action: 'kms:*'
+            Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub LAMBDAKMS-${Env}
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue     
+Outputs:
+  EDHLAMBDAEncryptionKeyArn:
+    Description: Lambda Function Encryption Key Arn
+    Value: !GetAtt EDHLAMBDAEncryptionKey.Arn 
+  EDHLAMBDAEncryptionKey:
+    Description: Lambda Function Encryption Key 
+    Value: !Ref EDHLAMBDAEncryptionKey   

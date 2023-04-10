@@ -1,0 +1,829 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: This Template create Lambda Function to perform the Elasticsearch operations.
+Parameters:
+  S3EDHMessageRAWBucketName:
+    Type: String
+    Description: Name of the bucket to store the RAW Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrawtest
+  S3EDHMessageErrorBucketName:
+    Type: String
+    Description: Name of the bucket to store the error Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingerrortest    
+  S3EDHMessageRefinedBucketName:
+    Type: String
+    Description: Name of the bucket to store the Redfined Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrefinedtest   
+  S3EDHMessagingRepositoryBucketName:
+    Type: String
+    Description: Name of the bucket for elasticsearch respository
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingesrepositorytest     
+  S3EDHTricklepollRawBucketName:
+    Type: String
+    Description: Name of the bucket to store tricklepoll raw dats
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhtricklepollrawtest 
+  S3EDHEMRPackageBucketName:
+    Type: String
+    Description: Name of the bucket containing EMR Packages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhpkgtest  
+  S3EDHScriptsBucketName:
+    Type: String
+    Description: Name of the bucket where the automation scripts are uploaded.    
+  LambdaCodeS3Bucket:
+    Description: The S3 Bucket that holds the lambda code
+    Type: String 
+  LambdaCodeS3Key:
+    Description: The S3 Bucket that holds the lambda Key ie.Zip file
+    Type: String      
+  VPCID:
+    Type: AWS::EC2::VPC::Id
+    Description: The physical ID of the VPC    
+  SubnetId:
+    Type: AWS::EC2::Subnet::Id
+    Description: The ID of the subnet to associate with the network interface.
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG    
+  ElasticsearchPassword:
+    Type: AWS::SSM::Parameter::Name
+    Description: Elasticsearch user login Password
+  ElasticsearchPasswordVersion:
+    Type: Number
+    Description: Elasticsearch user login Password Version
+    Default: 1
+  ElasticSearchHosts:
+    Type: String
+    Description: Elasticsearch Server Private IP
+  ElasticSearchUser: 
+    Type: AWS::SSM::Parameter::Value<String>
+    Description: Elasticsearch User ID Login Name
+  ElasticsearchSnapshotName:  
+    Type: String
+    Description: Elasticsearch Snapshots Name
+    Default: snapshot-20180914-000003179     
+  MaxS3BatchSize:
+    Type: String
+    Description: The Maximum Batch Size for the s3 key
+    Default: 250
+  LambdaKMSID:
+    Type: String
+    Description: KMS ID for Decrypt the ELS Password   
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH    
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value     
+Resources:
+  LambdaRole:
+    DependsOn: 
+      - EDHSNSPOSAuditSupport
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Policies:
+        - PolicyName: CloudFormationRead
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+            - Sid: S3bucketPermissions
+              Effect: Allow
+              Action:
+                - 's3:GetObject'
+                - 's3:PutObject'
+                - 's3:ListObjects'
+                - 's3:ListBucket'
+                - 's3:DeleteObject'
+                - 's3:PutBucketNotification'
+              Resource:
+                - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+                - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}/*'
+                - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+                - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}/*'
+                - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+                - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*'
+                - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}'
+                - !Sub 'arn:aws:s3:::${S3EDHMessagingRepositoryBucketName}/*'
+                - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'
+                - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}/*'
+                - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+                - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'                                 
+            - Sid: AWSCloudwatchLogs
+              Effect: Allow
+              Action:
+                - 'logs:CreateLogGroup'
+                - 'logs:CreateLogStream'
+                - 'logs:PutLogEvents'
+              Resource: '*'
+            - Sid: EC2NetworkInterfacePermissions
+              Effect: Allow
+              Action:
+                - 'ec2:CreateNetworkInterface'
+                - 'ec2:DeleteNetworkInterface'
+                - 'ec2:DescribeNetworkInterfaces'
+              Resource:
+                - '*'
+            - Sid: KMSDecryptPermissions
+              Effect: Allow
+              Action:
+                - 'kms:Decrypt'
+              Resource: !Sub arn:aws:kms:us-east-1:${AWS::AccountId}:key/${LambdaKMSID}
+            - Sid: LambdaInvokePermissions
+              Action:
+                - 'lambda:InvokeFunction'
+              Effect: Allow
+              Resource: '*'
+            - Sid: SNSPublishPermissions
+              Effect: Allow
+              Action:
+                - 'sns:ListTopics'
+                - 'sns:Publish'
+              Resource:
+                - !Ref EDHSNSPOSAuditSupport
+            - Sid: CloudwatchMetricAccess
+              Action:
+                - 'cloudwatch:PutMetricData'
+              Effect: Allow
+              Resource: '*'
+      RoleName: !Sub "ES-LAMBDA-${Env}"
+      Path: /
+  EDHSNSPOSAuditSupport:
+    Type: AWS::SNS::Topic
+    Properties: 
+      TopicName: !Sub ${Env}-edh-sns-pos-audit-support
+  EDHSNSPOSAuditSupportPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17' 
+        Statement:
+          - Sid: sns_permissions
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action:
+              - 'SNS:GetTopicAttributes'
+              - 'SNS:SetTopicAttributes'
+              - 'SNS:AddPermission'
+              - 'SNS:RemovePermission'
+              - 'SNS:DeleteTopic'
+              - 'SNS:Subscribe'
+              - 'SNS:ListSubscriptionsByTopic'
+              - 'SNS:Publish'
+              - 'SNS:Receive'
+            Resource: !Ref EDHSNSPOSAuditSupport
+            Condition:
+              StringEquals:
+                'AWS:SourceOwner': !Ref AWS::AccountId
+          - Sid: sns-s3-permissions
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action: 'SNS:Publish'
+            Resource: !Ref EDHSNSPOSAuditSupport
+            Condition:
+              ArnLike:
+                'aws:SourceArn':
+                  - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+                  - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+                  - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+                  - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'        
+      Topics:
+        - !Ref EDHSNSPOSAuditSupport   
+  ELSTricklepollLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:       
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Ingest data from amzs3edhtricklepollrawdev into elasticsearch'
+      FunctionName: !Sub "${Env}-edh-tricklepoll-elasticsearch-ingest"
+      Handler: 'es_messaging_ingest.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ESpwd: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ESuser: !Ref ElasticSearchUser
+          INGESTION_TYPE: 'tricklepoll'
+          S3error: !Ref S3EDHMessageErrorBucketName
+          S3refined: !Ref S3EDHMessageRefinedBucketName
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue           
+  ELSTricklepollLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSTricklepollLambdaFunction
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub arn:aws:s3:::${S3EDHTricklepollRawBucketName}         
+  ELSBulkUploadLambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:      
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Bulk uploads S3 files to Elasticsearch.'
+      FunctionName: !Sub "${Env}-edh-elasticsearch-bulk-upload"
+      Handler: 'es_batch_process.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_BUCKET: !Ref S3EDHMessageRAWBucketName
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ES_PASSWORD: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ES_USER: !Ref ElasticSearchUser
+          ES_TRICKLEPOLL_BUCKET: !Ref S3EDHTricklepollRawBucketName
+          S3_ERROR_BUCKET: !Ref S3EDHMessageErrorBucketName
+          S3_REFINED_BUCKET: !Ref S3EDHMessageRefinedBucketName  
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue                 
+  EDHBatchS3KeysLambdaFunction:
+    DependsOn:
+      - ELSBulkUploadLambdaFunction
+      - ELSTricklepollMessagingLambda
+      - ELSTricklepollLambdaFunction
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Creates batches of S3 Object Keys to be sent for bulk upload to Elasticsearch.'
+      FunctionName: !Sub "${Env}-edh-batch-s3-key"
+      Handler: 'es_batch_s3_keys.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          CANONICAL_LAMBDA_ARN: !GetAtt ELSTricklepollMessagingLambda.Arn 
+          ES_BATCH_PROCESS_LAMBDA: !Ref ELSBulkUploadLambdaFunction
+          ES_BUCKET: !Ref S3EDHMessageRAWBucketName
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ESpwd: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ESuser: !Ref ElasticSearchUser
+          ES_TRICKLEPOLL_BUCKET: !Ref S3EDHTricklepollRawBucketName
+          MAX_BATCH_SIZE: !Ref MaxS3BatchSize
+          TRICKLEPOLL_LAMBDA_ARN: !GetAtt ELSTricklepollLambdaFunction.Arn 
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue           
+  EDHSNSBatchTriggerProccess:
+    Type: AWS::SNS::Topic
+    Properties: 
+      TopicName: !Sub EDH-${Env}-Trigger-Batch-Process
+  EDHSNSBatchTriggerProccessSubscription:
+    Type: 'AWS::SNS::Subscription'
+    Properties:
+      Protocol: lambda
+      Endpoint: !GetAtt EDHBatchS3KeysLambdaFunction.Arn  
+      TopicArn: !Ref EDHSNSBatchTriggerProccess
+      DeliveryPolicy:
+        healthyRetryPolicy:
+          numRetries: 3
+          minDelayTarget: 20
+          maxDelayTarget: 20
+          numMinDelayRetries: 0
+          numMaxDelayRetries: 0
+          numNoDelayRetries: 0
+          backoffFunction: linear
+  EDHSNSBatchTriggerProccessPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: '2012-10-17' 
+        Statement:
+          - Sid: default_statement_ID
+            Effect: Allow
+            Principal:
+              AWS: '*'
+            Action:
+              - 'SNS:GetTopicAttributes'
+              - 'SNS:SetTopicAttributes'
+              - 'SNS:AddPermission'
+              - 'SNS:RemovePermission'
+              - 'SNS:DeleteTopic'
+              - 'SNS:Subscribe'
+              - 'SNS:ListSubscriptionsByTopic'
+              - 'SNS:Publish'
+              - 'SNS:Receive'
+            Resource: !Ref EDHSNSBatchTriggerProccess
+            Condition:
+              StringEquals:
+                'AWS:SourceOwner': !Ref AWS::AccountId        
+      Topics:
+        - !Ref EDHSNSBatchTriggerProccess            
+  EDHBatchS3KeysLambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - EDHBatchS3KeysLambdaFunction
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: sns.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Ref EDHSNSBatchTriggerProccess                
+  ELSTricklepollMessagingLambda:
+    Type: AWS::Lambda::Function
+    Properties:     
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Ingest data from amzs3edhmessagingrawdev into elasticsearch'
+      FunctionName: !Sub "${Env}-edh-messaging-elasticsearch-ingest"
+      Handler: 'es_messaging_ingest.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ESpwd: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ESuser: !Ref ElasticSearchUser
+          INGESTION_TYPE: canonical
+          S3error: !Ref S3EDHMessageErrorBucketName
+          S3refined: !Ref S3EDHMessageRefinedBucketName
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue         
+  ELSTricklepollMessagingLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSTricklepollMessagingLambda
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub arn:aws:s3:::${S3EDHMessageRAWBucketName}
+  ELSDeleteOldIndexLambda:
+    Type: AWS::Lambda::Function
+    Properties:       
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Deletes Elasticsearch indexes older than 2 years'
+      FunctionName: !Sub "${Env}-edh-delete-old-index"
+      Handler: 'es_delete_old_index.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ES_PASSWORD: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ES_USER: !Ref ElasticSearchUser
+          DEL_INDEX_DAYS: 731
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue           
+  ELSDeleteOldIndexScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "ELS Delete Old Index ScheduledRule"
+      ScheduleExpression: "cron(0 6 * * ? *)"
+      Name: !Sub ${Env}-edh-delete-old-index
+      State: "DISABLED"
+      Targets: 
+        - Arn: !GetAtt ELSDeleteOldIndexLambda.Arn
+          Id: "ELSDeleteOldIndexLambdaFunction"          
+  ELSDeleteOldIndexLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSDeleteOldIndexLambda
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ELSDeleteOldIndexScheduledRule.Arn                                                   
+  ELSHealthCheckLambda:
+    Type: AWS::Lambda::Function
+    Properties:      
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Publishes ES health check details as CloudWatch metrics'
+      FunctionName: !Sub "${Env}-edh-elasticsearch-health-check"
+      Handler: 'es_health_check.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 120
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_BUCKET: !Ref S3EDHMessageRAWBucketName
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ES_PASSWORD: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ES_USER: !Ref ElasticSearchUser
+          ES_TRICKLEPOLL_BUCKET: !Ref S3EDHTricklepollRawBucketName
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue           
+  ELSHealthCheckScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "Elasticsearch health Check every minute"
+      ScheduleExpression: "cron(0 1 * * ? *)"
+      Name: !Sub ${Env}-edh-elasticsearch-health-check
+      State: "ENABLED"
+      Targets: 
+        - Arn: !GetAtt ELSHealthCheckLambda.Arn
+          Id: "ELSHealthCheckLambdaFunction"          
+  ELSHealthCheckLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSHealthCheckLambda
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ELSHealthCheckScheduledRule.Arn 
+  ELSDeleteErrorIndexLambda:
+    Type: AWS::Lambda::Function
+    Properties:    
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Updates the error index when a file is deleted from the error bucket'
+      FunctionName: !Sub "${Env}-edh-delete-from-error-index"
+      Handler: 'es_delete_from_error.handler'
+      MemorySize: 128
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 300
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ES_PASSWORD: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ES_USER: !Ref ElasticSearchUser
+          S3_CANONICAL_BUCKET: !Ref S3EDHMessageRAWBucketName
+          S3_TRICKLEPOLL_BUCKET: !Ref S3EDHTricklepollRawBucketName
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue            
+  ELSDeleteErrorIndexLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSDeleteErrorIndexLambda
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: s3.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !Sub arn:aws:s3:::${S3EDHMessageErrorBucketName}   
+  ELSSnapshotLambda:
+    Type: AWS::Lambda::Function
+    Properties:    
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Takes Elasticsearch Cluster Snapshots'
+      FunctionName: !Sub "${Env}-edh-elasticsearch-snapshot"
+      Handler: 'es_snapshot.handler'
+      MemorySize: 300
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 120
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_SNAPSHOT_BUCKET: !Ref S3EDHMessagingRepositoryBucketName
+          ES_SNAPSHOT_REGION: !Ref AWS::Region
+          ES_HOSTS: !Ref ElasticSearchHosts
+          ES_PASSWORD: !Sub '{{resolve:ssm:${ElasticsearchPassword}:${ElasticsearchPasswordVersion}}}'
+          ES_USER: !Ref ElasticSearchUser
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue          
+  ELSSnapshotScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "Elasticsearch Snapshots every five minutes"
+      ScheduleExpression: "cron(0 5 * * ? *)"
+      Name: !Sub ${Env}-edh-elasticsearch-snapshot
+      State: "ENABLED"
+      Targets: 
+        - Arn: !GetAtt ELSSnapshotLambda.Arn
+          Id: "ELSSnapshotLambdaFunction"          
+  ELSSnapshotLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSSnapshotLambda
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ELSSnapshotScheduledRule.Arn   
+  ELSReloadFileSnapshotLambda:
+    DependsOn:
+      - ELSTricklepollMessagingLambda
+      - ELSBulkUploadLambdaFunction
+    Type: AWS::Lambda::Function
+    Properties:     
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Reloads all S3 files that were processed after a particular ES snapshot'
+      FunctionName: !Sub "${Env}-edh-reload-files-after-snapshot"
+      Handler: 'es_reload_files_after_snapshot.handler'
+      MemorySize: 300
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 120
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          CANONICAL_LAMBDA_ARN: !GetAtt ELSTricklepollMessagingLambda.Arn
+          ENV: !Ref Env
+          ES_BATCH_PROCESS_LAMBDA: !Ref ELSBulkUploadLambdaFunction 
+          ES_BUCKET: !Ref S3EDHMessageRAWBucketName 
+          ES_ERROR_BUCKET: !Ref S3EDHMessageErrorBucketName
+          ES_REFINED_BUCKET: !Ref S3EDHMessageRefinedBucketName
+          ES_SNAPSHOT_NAME: !Ref ElasticsearchSnapshotName 
+          ES_TRICKLEPOLL_BUCKET: S3EDHTricklepollRawBucketName
+          MAX_BATCH_SIZE: 250
+          TRICKLEPOLL_LAMBDA_ARN: !GetAtt ELSTricklepollMessagingLambda.Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue            
+  ELSNotifyUnprocesseFileLambda:
+    Type: AWS::Lambda::Function
+    DependsOn:
+      - EDHSNSPOSAuditSupport
+    Properties:     
+      Code:
+        S3Bucket: !Ref LambdaCodeS3Bucket
+        S3Key: !Ref LambdaCodeS3Key
+      Description: 'Sends an SNS notification when a file is unprocessed and sitting in the raw bucket'
+      FunctionName: !Sub "${Env}-edh-notification-unprocessed-file"
+      Handler: 'es_notification_unprocessed_file.handler'
+      MemorySize: 300
+      Role:
+        Fn::GetAtt: LambdaRole.Arn
+      Runtime: python3.6
+      Timeout: 120
+      VpcConfig: 
+        SecurityGroupIds:
+          - !Ref EDHLambdaSecurityGroup
+        SubnetIds:
+          - !Ref SubnetId
+      Environment:
+        Variables:
+          ENV: !Ref Env
+          ES_BUCKET: !Ref S3EDHMessageRAWBucketName
+          ES_TRICKLEPOLL_BUCKET: !Ref S3EDHTricklepollRawBucketName
+          ES_HOSTS: !Ref ElasticSearchHosts
+          HOURS: 12
+          SNS_TOPIC_ARN: !Ref EDHSNSPOSAuditSupport
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue            
+  ELSNotifyUnprocesseFileLambdaScheduledRule: 
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: "prod-edh-notification-unprocessed-file"
+      ScheduleExpression: "cron(0 4 * * ? *)"
+      Name: !Sub ${Env}-edh-edh-notification-unprocessed-file
+      State: "ENABLED"
+      Targets: 
+        - Arn: !GetAtt ELSNotifyUnprocesseFileLambda.Arn
+          Id: "ELSNotifyUnprocesseFileLambda"          
+  ELSNotifyUnprocesseFileLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt 
+        - ELSNotifyUnprocesseFileLambda
+        - Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: events.amazonaws.com
+      SourceAccount: !Ref 'AWS::AccountId'
+      SourceArn: !GetAtt ELSNotifyUnprocesseFileLambdaScheduledRule.Arn                                                                          
+  EDHLambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties: 
+      GroupName: !Sub EDH-TCO-${Env}-LAMBDA
+      GroupDescription: !Sub EDH-TCO-${Env}-LAMBDA
+      SecurityGroupIngress:
+        - CidrIp: 10.192.11.196/32
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 172.16.0.0/12
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+        - CidrIp: 10.255.0.0/16 
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22          
+        - CidrIp: 10.0.0.0/8
+          IpProtocol: tcp
+          FromPort: 5601
+          ToPort: 5601
+        - CidrIp: 172.16.0.0/12
+          IpProtocol: tcp
+          FromPort: 5601
+          ToPort: 5601           
+        - CidrIp: 10.255.0.0/16 
+          IpProtocol: tcp
+          FromPort: 5601
+          ToPort: 5601
+        - CidrIp: 172.16.0.0/12
+          IpProtocol: tcp
+          FromPort: 9300
+          ToPort: 9300           
+        - CidrIp: 10.255.0.0/16 
+          IpProtocol: tcp
+          FromPort: 9300
+          ToPort: 9300 
+        - CidrIp: 172.16.0.0/12
+          IpProtocol: tcp
+          FromPort: 9200
+          ToPort: 9200           
+        - CidrIp: 10.255.0.0/16 
+          IpProtocol: tcp
+          FromPort: 9200
+          ToPort: 9200
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 0.0.0.0/0                                                                                    
+      Tags:
+        - Key: Environment
+          Value: !Ref Env
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue  
+        - Key: Name
+          Value: !Sub EDH-TCO-${Env}-Lambda
+      VpcId: !Ref VPCID                  
+Outputs:
+  ELSTricklepollLambdaFunctionArn:
+    Value: !GetAtt ELSTricklepollLambdaFunction.Arn
+  ELSBulkUploadLambdaFunctionArn:
+    Value: !GetAtt ELSBulkUploadLambdaFunction.Arn
+  EDHBatchS3KeysLambdaFunctionArn:
+    Value: !GetAtt EDHBatchS3KeysLambdaFunction.Arn
+  ELSTricklepollMessagingLambdaArn:
+    Value: !GetAtt ELSTricklepollMessagingLambda.Arn
+  ELSDeleteOldIndexLambdaArn:
+    Value: !GetAtt ELSDeleteOldIndexLambda.Arn
+  ELSHealthCheckLambdaArn:
+    Value: !GetAtt ELSHealthCheckLambda.Arn
+  ELSDeleteErrorIndexLambdaArn:
+    Value: !GetAtt ELSDeleteErrorIndexLambda.Arn
+  ELSSnapshotLambdaArn:
+    Value: !GetAtt ELSSnapshotLambda.Arn
+  ELSReloadFileSnapshotLambdaArn:
+    Value: !GetAtt ELSReloadFileSnapshotLambda.Arn
+  ELSNotifyUnprocesseFileLambdaArn:
+    Value: !GetAtt ELSNotifyUnprocesseFileLambda.Arn    
+  LambdaFunctionRoleArn:
+    Value: !GetAtt LambdaRole.Arn
+  EDHLambdaSecurityGroupName:
+    Value: !Ref EDHLambdaSecurityGroup   

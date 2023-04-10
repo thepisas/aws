@@ -1,0 +1,590 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS cloud Formation Template to Create a ECS POS Cluster Which Includes the ALB,ALBListener,ALBListenerRule,Target groups,AutoScaling,LaunchConfiguration,TaskDefinition,Ecsservice,IAM Roles.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Environment
+        Parameters:
+          - Env
+          - Application
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - VPC
+          - SubnetId          
+      - Label:
+          default: ECS POS CLUSTER Configuration
+        Parameters:
+            - ECSPOSKeyName
+            - ECSPOSClusterName    
+            - ECSPOSOptimizedAMIID        
+            - ECSPOSDesiredCapacity
+            - ECSPOSMaxInstanceSize
+            - ECSPOSMinInstanceSize
+            - ECSPOSInstanceType 
+            - ECSPOSRootVolumeSize
+      - Label:
+          default: AutoScaling Configuration
+        Parameters:
+            - ECSPOSAutoscalinggroupname
+      - Label:
+          default: S3 Bucket Configuration
+        Parameters:
+          - S3EDHMessageRAWBucketName
+          - S3EDHMessageErrorBucketName
+          - S3EDHMessageRefinedBucketName
+          - S3EDHTricklepollRawBucketName
+          - S3EDHSSMBucketName 
+          - S3EDHScriptsBucketName                
+      - Label:
+          default: SSM Parameter Store Configuration
+        Parameters:
+          - ESSSMParameterName 
+      - Label:
+          default: Tagging Configuration
+        Parameters:
+          - EDHTCOTagKey
+          - EDHTCOTagValue                                                                
+Parameters:
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value  
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH    
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG 
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC that allows instances access to the Internet.            
+  SubnetId:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select atleast two  in your selected VPC.     
+  ECSPOSKeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.
+    Type: AWS::EC2::KeyPair::KeyName
+  ECSPOSClusterName:    
+    Description: Name of the cluster
+    Type: String
+    Default: amzlinecsrft01 
+  ECSPOSOptimizedAMIID:
+    Description: Provide a Valid ECS-Optimized AMI ID (Recommended for launching your Amazon ECS container instances in most cases.)
+    Type: String
+    Default: ami-28456852
+  ECSPOSDesiredCapacity:
+    Type: Number
+    Default: '1'
+    Description: Number of instances to launch in your ECS cluster.
+  ECSPOSMaxInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.
+  ECSPOSMinInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Minimum number of instances that can be launched in your ECS cluster.   
+  ECSPOSInstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m4.large
+    ConstraintDescription: Please choose a valid instance type.                                  
+  ECSPOSAutoscalinggroupname:
+    Type: String
+    Default: ecspostestcontainerinstance
+    Description: Provide a valid AutoScaling Group Name. 
+  S3EDHScriptsBucketName:
+    Type: String
+    Description: Name of the bucket where the automation scripts are uploaded.     
+  S3EDHMessageRAWBucketName:
+    Type: String
+    Description: Name of the bucket to store the RAW Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrawtest
+  S3EDHMessageErrorBucketName:
+    Type: String
+    Description: Name of the bucket to store the error Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingerrortest    
+  S3EDHMessageRefinedBucketName:
+    Type: String
+    Description: Name of the bucket to store the Redfined Messages
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhmessagingrefinedtest          
+  S3EDHTricklepollRawBucketName:
+    Type: String
+    Description: Name of the bucket to store tricklepoll raw dats
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3edhtricklepollrawtest 
+  S3EDHSSMBucketName:
+    Type: String
+    Description: Name of the bucket to Store SSM Parameters 
+    AllowedPattern: 'amzs3[a-z0-9-]*'
+    Default: amzs3testssm 
+  ESSSMParameterName:
+    Type: String
+    Description: SSM Parameters Store Name
+    Default: agent-config-linux
+  ECSPOSRootVolumeSize:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 50        
+Mappings:    
+  NameMap: 
+    PROD: 
+      lowecase: "prod"
+    TEST: 
+      lowecase: "test"
+    STG: 
+      lowecase: "stg"
+    DEV: 
+      lowecase: "dev"  
+    QA: 
+      lowecase: "qa" 
+  CamelCaseMap: 
+    PROD: 
+      lowecase: "Prod"
+    TEST: 
+      lowecase: "Test"
+    STG: 
+      lowecase: "Stg"
+    DEV: 
+      lowecase: "Dev"  
+    QA: 
+      lowecase: "Qa"                                       
+Resources:
+  ECSPOSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ECSPOSClusterName
+  ECSPOSSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub ECSRF${Env}-SG
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ECSRF${Env}-SG
+        - Key: Env
+          Value: !Ref Env
+        - Key: Vendor
+          Value: MontyCloud 
+      GroupDescription: >-
+         ECS RF Prod Security Group             
+      SecurityGroupIngress:        
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 10.192.11.196/32
+        - IpProtocol: tcp
+          FromPort: '80'
+          ToPort: '80'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 10.192.11.196/32
+        - IpProtocol: tcp
+          FromPort: '22'
+          ToPort: '22'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: icmp
+          FromPort: '8'
+          ToPort: '-1'
+          CidrIp: 0.0.0.0/0           
+        - IpProtocol: udp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: udp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 172.16.0.0/12     
+  ECSPOSSecurityGroupALBports:
+    Type: AWS::EC2::SecurityGroupIngress
+    DependsOn: 
+      - ECSPOSSecurityGroup
+    Properties:
+      GroupId: !GetAtt 'ECSPOSSecurityGroup.GroupId'
+      IpProtocol: tcp
+      FromPort: '31000'
+      ToPort: '61000'
+      SourceSecurityGroupId: !GetAtt 'ECSPOSSecurityGroup.GroupId'                                 
+  ECSPOSALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join
+        - ''
+        - - 'ecsrf'
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+      Scheme: internal
+      IpAddressType: ipv4
+      Type: application
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '60'
+      - Key: routing.http2.enabled 
+        Value: true 
+      Subnets: !Ref 'SubnetId'
+      SecurityGroups: [!Ref 'ECSPOSSecurityGroup']
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-EMR-${Env}
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+        - Key: Environment
+          Value: !Ref Env  
+  ECSPOSALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: ECSPOSServiceRole
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSPOSTRGP'
+      LoadBalancerArn: !Ref 'ECSPOSALB'
+      Port: '80'
+      Protocol: HTTP
+  ECSPOSALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn: ECSPOSALBListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSPOSTRGP'
+      Conditions:
+      - Field: path-pattern
+        Values: [/]
+      ListenerArn: !Ref 'ECSPOSALBListener'
+      Priority: 1
+  ECSPOSTRGP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: ECSPOSALB
+    Properties:
+      HealthCheckIntervalSeconds: 300
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Port: 32768
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC 
+      TargetGroupAttributes:
+       - Key: deregistration_delay.timeout_seconds
+         Value: '300'
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-EMR-${Env}
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+        - Key: Environment
+          Value: !Ref Env                      
+  ECSPOSAutoScalingGroup:
+    DependsOn: ECSPOSCluster
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Ref ECSPOSAutoscalinggroupname
+      VPCZoneIdentifier: !Ref SubnetId
+      TargetGroupARNs: 
+       - !Ref ECSPOSTRGP
+      LaunchConfigurationName: !Ref ECSPOSLaunchConfig
+      MinSize: !Ref ECSPOSMinInstanceSize
+      MaxSize: !Ref ECSPOSMaxInstanceSize
+      DesiredCapacity: !Ref ECSPOSDesiredCapacity
+      HealthCheckType: EC2
+      Tags:
+        - Key: Application
+          Value: !Ref Application   
+          PropagateAtLaunch: true       
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref Env
+          PropagateAtLaunch: true          
+  ECSPOSLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName: !Ref ECSPOSKeyName
+      ImageId: !Ref ECSPOSOptimizedAMIID
+      EbsOptimized: true
+      InstanceMonitoring: true
+      InstanceType: !Ref ECSPOSInstanceType
+      IamInstanceProfile: !Ref ECSPOSInstanceProfile
+      AssociatePublicIpAddress: true
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          echo ECS_CLUSTER=${ECSPOSCluster} >> /etc/ecs/ecs.config
+          echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvdcz"
+          Ebs:
+           VolumeSize: !Ref ECSPOSRootVolumeSize #'50'
+      SecurityGroups:
+        - !Ref ECSPOSSecurityGroup
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              collectd: []
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${ECSPOSCluster} >> /etc/ecs/ecs.config
+          files:
+            /etc/cfn/cfn-hup.conf:
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ECSPOSLaunchConfig.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSPOSLaunchConfig
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf          
+  ECSPOSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      RoleName: !Sub ECS_LB_${Env}_ROLE       
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: ['elasticloadbalancing:DeregisterInstancesFromLoadBalancer', 'elasticloadbalancing:DeregisterTargets',
+              'elasticloadbalancing:Describe*', 'elasticloadbalancing:RegisterInstancesWithLoadBalancer',
+              'elasticloadbalancing:RegisterTargets', 'ec2:Describe*', 'ec2:AuthorizeSecurityGroupIngress']
+            Resource: '*'
+  EDHECSPOSROLE:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      RoleName: !Sub ECS_${Env}_ROLE
+      Policies:
+      - PolicyName: AmazonEC2ContainerServiceforEC2Role
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ecs:CreateCluster'
+              - 'ecs:DeregisterContainerInstance'
+              - 'ecs:DiscoverPollEndpoint'
+              - 'ecs:Poll'
+              - 'ecs:RegisterContainerInstance'
+              - 'ecs:StartTelemetrySession'
+              - 'ecs:UpdateContainerInstancesState'
+              - 'ecs:Submit*'
+              - 'ecr:GetAuthorizationToken'
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:BatchGetImage'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+            Resource: '*'    
+      - PolicyName: AmazonEC2ReadOnlyAccess
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ec2:Describe*'
+              - 'elasticloadbalancing:Describe*'
+              - 'cloudwatch:ListMetrics'
+              - 'cloudwatch:GetMetricStatistics'
+              - 'cloudwatch:Describe*'
+              - 'autoscaling:Describe*'
+            Resource: '*' 
+      - PolicyName: TCO_SSM_Policy_For_EC2
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ssm:DescribeAssociation'
+              - 'ssm:GetDeployablePatchSnapshotForInstance'
+              - 'ssm:GetDocument'
+              - 'ssm:GetManifest'
+              - 'ssm:ListAssociations'
+              - 'ssm:ListInstanceAssociations'
+              - 'ssm:PutInventory'
+              - 'ssm:PutComplianceItems'
+              - 'ssm:PutConfigurePackageResult'
+              - 'ssm:UpdateAssociationStatus'
+              - 'ssm:UpdateInstanceAssociationStatus'
+              - 'ssm:UpdateInstanceInformation'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ssm:DescribeParameters'
+              - 'ssm:PutParameter'
+              - 'ssm:GetParameters'
+              - 'ssm:GetParameter'
+              - 'ssm:DeleteParameter'
+            Resource: !Sub arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/${ESSSMParameterName}
+          - Effect: Allow
+            Action:
+              - 'ec2messages:AcknowledgeMessage'
+              - 'ec2messages:DeleteMessage'
+              - 'ec2messages:FailMessage'
+              - 'ec2messages:GetEndpoint'
+              - 'ec2messages:GetMessages'
+              - 'ec2messages:SendReply'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'cloudwatch:PutMetricData'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ec2:DescribeInstanceStatus'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'ds:CreateComputer'
+              - 'ds:DescribeDirectories'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:DescribeLogGroups'
+              - 'logs:DescribeLogStreams'
+              - 'logs:PutLogEvents'
+            Resource: '*'
+          - Effect: Allow
+            Action:
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:AbortMultipartUpload'
+              - 's3:ListMultipartUploadParts'
+              - 's3:ListBucket'
+              - 's3:ListBucketMultipartUploads'
+            Resource:
+              - 'arn:aws:s3:::${S3EDHSSMBucketName}'
+              - 'arn:aws:s3:::${S3EDHSSMBucketName}/*'
+      - PolicyName: s3_for_ecs
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetBucketPolicy'
+              - 's3:ListAllMyBuckets'
+            Resource: 'arn:aws:s3:::*'
+          - Effect: Allow
+            Action:
+              - 's3:ListBucket'
+              - 's3:GetBucketPolicy'
+              - 's3:GetBucketLocation'
+            Resource:
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'                
+          - Effect: Allow
+            Action:
+              - 's3:PutObject'
+              - 's3:GetObject'
+              - 's3:GetObjectVersion'
+              - 's3:DeleteObject'
+              - 's3:DeleteObjectVersion'
+              - 's3:ListBucket'
+              - 's3:GetBucketPolicy'
+            Resource:
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHTricklepollRawBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRAWBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageRefinedBucketName}/*'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHMessageErrorBucketName}/*'  
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}'
+              - !Sub 'arn:aws:s3:::${S3EDHScriptsBucketName}/*'                                                        
+  ECSPOSInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref 'EDHECSPOSROLE']                         
+Outputs:
+  ECSPOSClusterName:
+    Description: Name of an ECS POS Cluster. 
+    Value: !Ref 'ECSPOSCluster'
+  ECSPOSTargetGroup:
+    Description: An Application Load Balancer target group Amazon Resource Name (ARN) to associate with the Amazon ECS service.
+    Value: !Ref 'ECSPOSTRGP'  
+  ECSALB:
+    Description: It specifies ARN of the load balancer to associate with an Amazon Elastic Container Service (Amazon ECS) service.
+    Value: !Ref 'ECSPOSALB'      
+  LaunchConfiguration:
+    Description: Amazon EC2 Auto Scaling launch configuration that can be used by an Auto Scaling group to configure Amazon ECS instances.
+    Value: !Ref 'ECSPOSLaunchConfig'
+  ECSPOSAutoscalinggroup:
+    Description: Auto Scaling group to control how rolling updates are performed when a change has been made to the Auto Scaling group's launch configuration.
+    Value: !Ref 'ECSPOSAutoScalingGroup'

@@ -1,0 +1,826 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description:  This template create a nested stack that creates 7 nested stacks such as the Kibana Server, Lambda Function to the Elasticsearch operations, ECS Cluster for POS and Korea Trade and Lambda Function to Execute Redshift and Oracle DDLS.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Cloudformation Stack Configuration
+        Parameters:
+          - ELSKibannaStack
+          - ECSPOSStack  
+          - ECSKTStack  
+          - RedshiftLambdaDDLStack          
+      - Label:
+          default: Elasticsearch Instance Configuration
+        Parameters:
+          - ElasticSearchServerName
+          - ElasticsearchSnapshotName
+          - ESAmiID
+          - KibanaInstanceType
+          - ESInstanceType
+          - ESInstanceVolumeSize
+          - ESInstanceVolumeType
+          - ESUsersList
+          - S3EDHESKIBScriptBucketName
+      - Label:
+          default: Elastic Search Cluster Configuration
+        Parameters:
+          - NodesInCluster
+          - LaunchKibanaNodeFlag
+          - ESParmStrNonDefaultSuperUserName
+          - ESParmStrNonDefaultSuperUserPswd
+          - ESParmStrResetDefaultUserPswd
+          - ESParmStrLDAPBindPswd
+          - ESParamStrMasterNodeOnePvtIP
+          - ESParamStrMasterNodeTwoPvtIP
+          - ESParamStrMasterNodeThreePvtIP         
+      - Label:
+          default: Lambda Function Configuration
+        Parameters:
+          - LambdaCodeS3Key 
+          - ElasticSearchUser
+          - ESKibanaServerName
+          - MaxS3BatchSize                               
+      - Label:
+          default: EDH Encryption Configuration
+        Parameters:
+          - EncryptedPasswordParameterStoreName            
+      - Label:
+          default: ECS POS CLUSTER Configuration
+        Parameters:
+            - ECSPOSClusterName    
+            - ECSPOSOptimizedAMIID        
+            - ECSPOSDesiredCapacity
+            - ECSPOSMaxInstanceSize
+            - ECSPOSMinInstanceSize
+            - ECSPOSInstanceType
+            - ECSPOSRootVolumeSize
+      - Label:
+          default: ECS Korea Trade CLUSTER Configuration
+        Parameters:
+            - ECSKTClusterName    
+            - ECSKTOptimizedAMI        
+            - ECSKTDesiredCapacity
+            - ECSKTMinInstanceSize
+            - ECSKTMaxInstanceSize
+            - ECSKTInstanceType   
+            - ECKTRootVolumeSize                      
+      - Label:
+          default: ECS AutoScaling Configuration
+        Parameters:
+            - ECSPOSAutoscalinggroupname  
+            - ECSKTAutoscalinggroupname   
+      - Label:
+          default: Redshift DDL Execution Lambda Configuration 
+        Parameters:
+            - RedshiftDDLBucketName
+            - RedshiftDDLS3Keys
+            - RedshiftDeploymentPackageKey    
+            - RedshiftPasswordValidUntil 
+      - Label:
+          default: Oracle DDL Execution Server Configuration 
+        Parameters:
+            - OracleDDLS3Key
+            - S3EDHOracleDDLScriptsBucketName                                
+      - Label:
+          default: Cloudformation Template Configuration 
+        Parameters:
+            - CFTS3BucketName
+            - CFTS3KeyPrefix      
+      - Label:
+          default: Import Stack Configuration 
+        Parameters:
+            - EDHTCOMasterStack
+            - EDHTCOVPCMasterStack                          
+Parameters:  
+  ELSKibannaStack:
+    Default: 'Yes'
+    Description: Do we need a Elasticsearch Kibana Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'   
+  RedshiftLambdaDDLStack:
+    Default: 'Yes'
+    Description: Do we need a Redshift Lambda Execution DDL Stack ?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'                  
+  ECSPOSStack:
+    Default: 'Yes'
+    Description: Do we need a ECS cluster for POS Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+  ECSKTStack:
+    Default: 'Yes'
+    Description: Do we need a ECS cluster for Korea trade Stack?
+    Type: String
+    AllowedValues:
+      - 'Yes'
+      - 'No'  
+  LatestAmiId:
+    Type: 'AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>'
+    Default: '/aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2'          
+  EncryptedPasswordParameterStoreName:
+    Type: String
+    Description: Name for the Parameter Store to save the encrypted password. 
+    Default: ELSLambdaEncryptedPassword  
+  ESParmStrNonDefaultSuperUserName:
+    Type: AWS::SSM::Parameter::Name
+    Description: Name of the Parameter Store to get NonDefault Username.
+    Default: ElasticSearch_DefaultSuperUserName_Test
+  ESParmStrNonDefaultSuperUserPswd:
+    Type: AWS::SSM::Parameter::Name
+    Description: Name of the Parameter Store to get NonDefault Username password.
+    Default: ElasticSearch_DefaultSuperUserPassword_Test
+  ESParmStrResetDefaultUserPswd:
+    Type: AWS::SSM::Parameter::Name
+    Description: Name of the Parameter Store to reset the default user password for elastic user and use by Lambda Fn.
+    Default: ElasticSearch_LambdaESUserPassword_Test
+  ESParmStrLDAPBindPswd:
+    Type: AWS::SSM::Parameter::Name
+    Description: Name of the Parameter Store to get LDAP Bind password.
+    Default: ElasticSearch_LDAPBindPassword_Test
+  EDHTCOMasterStack:
+    Description: >-
+      Name of an active CloudFormation stack that contains the infrastructure
+      resources, such as RDS, Redshift and Informatica Server.
+    Type: String      
+  ElasticsearchSnapshotName:  
+    Type: String
+    Description: Elasticsearch Snapshots Name
+    Default: snapshot-20180914-000003179         
+  LambdaCodeS3Key: 
+    Description: The S3 Bucket that holds the lambda Key ie.Zip file
+    Type: String    
+  MaxS3BatchSize:
+    Type: String
+    Description: The Maximum Batch Size for the s3 key
+    Default: 250      
+  ESAmiID:
+    Type: String
+    Description: AMI ID with which Instances will be launched.
+  ESInstanceType:
+    Description: ElasticSearch Node for ESearch
+    Type: String
+    Default: m5.xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  KibanaInstanceType:
+    Description: ElasticSearch Node for Kibana
+    Type: String
+    Default: m5.xlarge
+    ConstraintDescription: must be a valid EC2 instance type.
+  ElasticSearchServerName:
+    Type: String
+    Description: Name of the ElasticSearch Server Name
+    AllowedPattern: 'amz[a-z0-9-]*'  
+    Default: amzlinelat  
+  ESKibanaServerName:
+    Type: String
+    Description: Name of the ElasticSearch Server Name
+    AllowedPattern: 'amz[a-z0-9-]*'  
+    Default: amzlinkibt 
+  ESUsersList:
+    Type: String
+    Description: Linux User Account for ElasticSearch and Kibana Nodes.
+    Default: 'adatta,csett,skarmaka,droglier,nirchoud,mkundu,negupta,rpraksh,sbanerje'    
+  NodesInCluster:
+    Default: '3'
+    Description: Choose Maximum number of Nodes in Cluster.
+    Type: String
+    AllowedValues:
+      - '1'
+      - '2'
+      - '3'
+      - '4'
+      - '5'
+      - '6'
+  LaunchKibanaNodeFlag:
+    Type: String
+    Description: Should Kibana Node be launched?
+    AllowedValues:
+      - 'Yes'
+      - 'No'
+    Default: 'Yes'
+  ESInstanceVolumeSize:
+    Type: String
+    Description: EBS Volume Size for EC2 Instance.
+    Default: 128    
+  ESInstanceVolumeType:
+    Type: String
+    Description: EBS Volume Type for EC2 Instance.
+    Default: gp2
+  S3EDHESKIBScriptBucketName:
+    Type: String
+    Description: Name of the bucket to store the RAW Messages
+    Default: tiffany-edh-environment-build-prerequisites/cloudformation/scripts/ConfigurationFiles/ElasticSearch/scripts    
+  ESParamStrMasterNodeOnePvtIP:
+    Type: String
+    Description: Name of the Parameter Store to store master node 1 pvt ip.
+    Default: ES-masternode1-ipaddress
+  ESParamStrMasterNodeTwoPvtIP:
+    Type: String
+    Description: Name of the Parameter Store to store master node 2 pvt ip.
+    Default: ES-masternode2-ipaddress
+  ESParamStrMasterNodeThreePvtIP:
+    Type: String
+    Description: Name of the Parameter Store to store master node 3 pvt ip.
+    Default: ES-masternode3-ipaddress                 
+  ECSPOSClusterName:    
+    Description: Name of the cluster
+    Type: String
+    Default: amzlinecsrft01 
+  ECSPOSOptimizedAMIID:
+    Description: Provide a Valid ECS-Optimized AMI ID (Recommended for launching your Amazon ECS container instances in most cases.)
+    Type: String
+    Default: ami-28456852
+  ECSPOSDesiredCapacity:
+    Type: Number
+    Default: '1'
+    Description: Number of instances to launch in your ECS cluster.
+  ECSPOSMaxInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.
+  ECSPOSMinInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Minimum number of instances that can be launched in your ECS cluster.    
+  ECSPOSInstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m4.large
+    ConstraintDescription: Please choose a valid instance type.           
+  ECSPOSAutoscalinggroupname:
+    Type: String
+    Default: ecstestcontainerinstance
+    Description: Provide a valid AutoScaling Group Name. 
+  ECSPOSRootVolumeSize: 
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 50      
+  ECSKTClusterName:    
+    Description: Name of the cluster
+    Type: String
+    Default: ecs-test
+  ECSKTOptimizedAMI:
+    Description: Provide a Valid ECS-Optimized AMI ID
+    Type: String   
+    Default: ami-aff65ad2  
+  ECSKTDesiredCapacity:
+    Type: Number
+    Default: '1'
+    Description: Number of instances to launch in your ECS cluster.
+  ECSKTMinInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.    
+  ECSKTMaxInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.
+  ECKTRootVolumeSize:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 50  
+  ECSKTInstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m4.xlarge
+    ConstraintDescription: Please choose a valid instance type.  
+  RedshiftDDLS3Keys:
+    Type: String
+    Description: S3 Key for the the Redshift DDL's
+  RedshiftDeploymentPackageKey:
+    Type: String
+    Description: Redshift lambda Deployment package S3 Bucket Key  
+  S3EDHOracleDDLScriptsBucketName:
+    Type: String
+    Description: Oracle RDS Script Bucket name     
+  OracleDDLS3Key:
+    Type: String
+    Description: Oracle RDS DDL File Zip    
+  ECSKTAutoscalinggroupname:
+    Type: String
+    Default: ecskoreatradetestcontainerinstance
+    Description: Provide a valid AutoScaling Group Name.                                
+  CFTS3BucketName:
+    AllowedPattern: '[a-z0-9-]*'
+    ConstraintDescription: CloudFormation bucket name can include numbers, lowercase
+      letters and hyphens (-). It cannot start or end with a hyphen
+      (-).
+    Description: S3 bucket name for the CloudFormation templates.
+    Type: String
+  CFTS3KeyPrefix:
+    ConstraintDescription: Cloudformation key prefix can include numbers, lowercase letters,
+      uppercase letters, hyphens (-), and forward slash (/).
+    Description: S3 key prefix for the CloudFormation templates.
+    Type: String  
+  EDHTCOVPCMasterStack:
+    Description: >-
+      Name of an active CloudFormation stack that contains the networking
+      resources, such as the subnet and security group, that will be used in
+      this stack.
+    Type: String   
+  RedshiftPasswordValidUntil:
+    Description: Redshift Password Valid Until in Days
+    Type: String
+    Default: 10     
+Mappings: 
+  NameMap: 
+    PROD: 
+      lowecase: "prod"
+    TEST: 
+      lowecase: "test"
+    STG: 
+      lowecase: "stg"
+    DEV: 
+      lowecase: "dev"  
+    QA: 
+      lowecase: "qa" 
+  CamelCaseMap: 
+    PROD: 
+      lowecase: "Prod"
+    TEST: 
+      lowecase: "Test"
+    STG: 
+      lowecase: "Stg"
+    DEV: 
+      lowecase: "Dev"  
+    QA: 
+      lowecase: "Qa"         
+Conditions:
+  S3KeyPrefix: !Not 
+    - !Equals 
+      - ''
+      - !Ref CFTS3KeyPrefix       
+  CreateELSKibannaStack: !Equals 
+    - !Ref ELSKibannaStack
+    - 'Yes' 
+  CreateECSPOSStack: !Equals 
+    - !Ref ECSPOSStack
+    - 'Yes'
+  CreateECSKTStack: !Equals 
+    - !Ref ECSKTStack
+    - 'Yes' 
+  CreateRedshiftLambdaDDL: !Equals 
+    - !Ref RedshiftLambdaDDLStack
+    - 'Yes'              
+Resources:     
+  EDHKMSStack:
+    Condition: CreateELSKibannaStack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-KMS-Key.yaml'
+      Parameters:
+        Env: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment'          
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'  
+  EDHEncryptionLambdaStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateELSKibannaStack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-Encryption-LambdaFunction.yaml'
+      Parameters:
+        ELSPassParameterstoreName: !Ref 'ESParmStrNonDefaultSuperUserPswd'
+        EDHSSMParameterStoreName: !Ref 'EncryptedPasswordParameterStoreName'
+        EDHLambdaKMSKey: !GetAtt EDHKMSStack.Outputs.EDHLAMBDAEncryptionKey 
+        Env: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment'          
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'                   
+  ELSKibanaServerStack:
+    Type: AWS::CloudFormation::Stack
+    DependsOn:
+      - EDHEncryptionLambdaStack
+    Condition: CreateELSKibannaStack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ELS-kibana-Server.yaml'
+      Parameters:
+        Env: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment'
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'               
+        S3EDHMessageRAWBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRAWBucket'
+        S3EDHMessageErrorBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingErrorBucket'                   
+        S3EDHMessageRefinedBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRefinedBucket'          
+        S3EDHMessagingRepositoryBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRepositoryBucket'
+        S3EDHTricklepollRawBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTricklepollRawBucket'
+        S3EDHESKIBScriptBucketName: !Ref S3EDHESKIBScriptBucketName
+        ESParmStrNonDefaultSuperUserName: !Ref ESParmStrNonDefaultSuperUserName
+        ESParmStrNonDefaultSuperUserPswd: !Ref ESParmStrNonDefaultSuperUserPswd
+        ESParmStrResetDefaultUserPswd: !Ref ESParmStrResetDefaultUserPswd
+        ESParmStrLDAPBindPswd: !Ref ESParmStrLDAPBindPswd
+        ESUsersList: !Ref ESUsersList
+        ESParamStrMasterNodeThreePvtIP: !Ref ESParamStrMasterNodeThreePvtIP
+        ESParamStrMasterNodeTwoPvtIP: !Ref ESParamStrMasterNodeTwoPvtIP
+        ESParamStrMasterNodeOnePvtIP: !Ref ESParamStrMasterNodeOnePvtIP
+        ESInstanceVolumeType: !Ref ESInstanceVolumeType #gp2
+        ESInstanceVolumeSize: !Ref ESInstanceVolumeSize #128
+        ESTimeZone: America/New_York
+        LaunchKibanaNodeFlag: !Ref LaunchKibanaNodeFlag
+        NodesInCluster: !Ref NodesInCluster
+        ESKeyPairName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-KeyName'
+        ESAmiID: !Ref 'ESAmiID'
+        ESInstanceType: !Ref 'ESInstanceType'
+        KibanaInstanceType: !Ref 'KibanaInstanceType'
+        VPCID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'          
+        EDHSecurityGroupId: !Join 
+          - ','
+          - - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-MGMEM7SecurityGroupID'
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-DPMSSSecurityGroupID' 
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-LinuxSecurityGroupID'          
+        ESSubnetIds: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet5'          
+        S3EDHSSMBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHS3EDHSSMBucket'          
+        ESSSMParameterName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-ESSSMParameterStoreName'          
+        ElasticSearchServerName: !Ref 'ElasticSearchServerName' 
+        ESKibanaServerName: !Ref 'ESKibanaServerName'       
+  EDHLambdaFunctionStack:
+    Condition: CreateELSKibannaStack
+    DependsOn: 
+      - ELSKibanaServerStack
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ELS-LambdaFunction.yaml'
+      Parameters:
+        S3EDHScriptsBucketName: !Ref CFTS3BucketName
+        S3EDHMessageRAWBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRAWBucket'          
+        S3EDHMessageErrorBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingErrorBucket'          
+        S3EDHMessageRefinedBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRefinedBucket'          
+        S3EDHMessagingRepositoryBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRepositoryBucket'          
+        S3EDHTricklepollRawBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTricklepollRawBucket'          
+        S3EDHEMRPackageBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHPkgBucket'          
+        Env: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment' 
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'                        
+        LambdaCodeS3Bucket: !Ref 'CFTS3BucketName'
+        VPCID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'          
+        SubnetId: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet7'          
+        ElasticsearchPassword: !Ref EncryptedPasswordParameterStoreName    
+        ElasticsearchPasswordVersion: 1      
+        ElasticSearchHosts: !GetAtt ELSKibanaServerStack.Outputs.ElasticSearchServerInstancesIPs
+        ElasticSearchUser: !Ref ESParmStrNonDefaultSuperUserName
+        ElasticsearchSnapshotName: !Ref 'ElasticsearchSnapshotName'
+        LambdaCodeS3Key: !Ref 'LambdaCodeS3Key'
+        MaxS3BatchSize: !Ref 'MaxS3BatchSize' 
+        LambdaKMSID: !GetAtt EDHKMSStack.Outputs.EDHLAMBDAEncryptionKey         
+  EDHECSPOSClusterStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateECSPOSStack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ECS-POS-Cluster.yaml'
+      Parameters:
+        VPC: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'          
+        SubnetId: !Join 
+          - ','
+          - - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet5'
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet6'
+        ECSPOSKeyName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-KeyName'          
+        ECSPOSClusterName: !Ref 'ECSPOSClusterName'
+        ECSPOSOptimizedAMIID: !Ref 'ECSPOSOptimizedAMIID'
+        ECSPOSDesiredCapacity: !Ref ECSPOSDesiredCapacity
+        ECSPOSMinInstanceSize: !Ref ECSPOSMinInstanceSize
+        ECSPOSMaxInstanceSize: !Ref ECSPOSMaxInstanceSize
+        ECSPOSInstanceType: !Ref 'ECSPOSInstanceType'
+        ECSPOSRootVolumeSize: !Ref ECSPOSRootVolumeSize
+        ECSPOSAutoscalinggroupname: !Ref ECSPOSAutoscalinggroupname
+        S3EDHScriptsBucketName: !Ref CFTS3BucketName
+        S3EDHMessageRAWBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRAWBucket'          
+        S3EDHMessageErrorBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingErrorBucket'          
+        S3EDHMessageRefinedBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHMessagingRefinedBucket'          
+        S3EDHTricklepollRawBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTricklepollRawBucket'          
+        S3EDHSSMBucketName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHS3EDHSSMBucket'          
+        ESSSMParameterName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-ESSSMParameterStoreName'           
+        Env: 
+           'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment'  
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'                       
+  EDHECSKTClusterStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateECSKTStack
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-ECS-KoreaTrade-Cluster.yaml'
+      Parameters:
+        VPC: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'          
+        SubnetId: !Join 
+          - ','
+          - - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet5'
+            - 'Fn::ImportValue':
+                'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet6'
+        ECSKTKeyPair: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-KeyName'     
+        ECKTRootVolumeSize: !Ref ECKTRootVolumeSize #50     
+        ECSKTClusterName: !Ref 'ECSKTClusterName'
+        ECSKTOptimizedAMI: !Ref 'ECSKTOptimizedAMI'
+        ECSKTDesiredCapacity: !Ref ECSKTDesiredCapacity
+        ECSKTMinInstanceSize: !Ref ECSKTMinInstanceSize
+        ECSKTMaxInstanceSize: !Ref ECSKTMaxInstanceSize
+        ECSKTInstanceType: !Ref 'ECSKTInstanceType'
+        ECSKTAutoscalinggroupname: !Ref ECSKTAutoscalinggroupname   
+        Env:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment'  
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue'                             
+  EDHRedshiftDDLLambdaStack:
+    Type: AWS::CloudFormation::Stack
+    Condition: CreateRedshiftLambdaDDL
+    Properties:
+      TemplateURL: !Join 
+        - ''
+        - - 'https://s3.amazonaws.com/'
+          - !Ref CFTS3BucketName
+          - !If 
+            - S3KeyPrefix
+            - !Sub '/${CFTS3KeyPrefix}'
+            - !Ref 'AWS::NoValue'
+          - '/TCO-EDH-RedshiftDDL-LambdaFunction.yaml'
+      Parameters:
+        VPCID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-VPCID'          
+        SubnetId:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet7'    
+        RedshiftDDLBucketName: !Ref CFTS3BucketName
+        S3RedshiftDDLKeys: !Ref 'RedshiftDDLS3Keys'
+        RedshiftHostEndpoint: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-RedshiftClusterEndpoint'  
+        EDHRedshiftPasswordPSName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHRedshiftUserPasswordPSName'           
+        EDHRedshiftPasswordPSVersion: 1
+        RedshiftPasswordValidUntil: !Ref RedshiftPasswordValidUntil
+        RedshiftPortNumber: 5439
+        EDHRedshiftUserName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-RedshiftMasterUsername'           
+        RedshiftSubnetCIDR: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet8Cidr'           
+        RedshiftDeploymentPackageKey: !Ref RedshiftDeploymentPackageKey   
+        RedshiftSecurityGroupID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-RedshiftSecurityGroupID'   
+        LambdaSubnetCIDR:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet7Cidr'             
+        Env:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Environment'  
+        Application: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-Application'           
+        EDHTCOTagKey: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagKey'
+        EDHTCOTagValue: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHTCOTagValue' 
+        RSDOraclePasswordPSName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-EDHOracleRDUserPasswordPSName'           
+        OracleRDSUser:   
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-RDSOracleMasterUsername'           
+        OracleRDSHostName: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-OracleEndpointAddress'           
+        OraclePortNumber: 1521
+        OracleRDSSID: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-RDSOracleDBName'           
+        OracleDDLKey: !Ref OracleDDLS3Key
+        RDSOracleDBSecurityGroupsID:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-RDSOracleDBSecurityGroupsID'           
+        OracleRDSCIDR1:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet3Cidr'            
+        OracleRDSCIDR2: 
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOVPCMasterStack}-PrvSubnet4Cidr'            
+        ImageId: !Ref LatestAmiId
+        S3EDHScriptsBucketName: !Ref S3EDHOracleDDLScriptsBucketName
+        KeyName:
+            'Fn::ImportValue':
+              'Fn::Sub': '${EDHTCOMasterStack}-KeyName'          
+        InstanceType: t2.micro                                    
+Outputs:
+  ECSPOSClusterName:
+    Description: Name of an ECS POS Cluster. 
+    Value: !GetAtt EDHECSPOSClusterStack.Outputs.ECSPOSClusterName
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSPOSClusterName'
+  ECSPOSTargetGroup:
+    Description: An Application Load Balancer target group Amazon Resource Name (ARN) to associate with the Amazon ECS service.
+    Value: !GetAtt EDHECSPOSClusterStack.Outputs.ECSPOSTargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSPOSTargetGroup'
+  ECSALB:
+    Description: It specifies ARN of the load balancer to associate with an Amazon Elastic Container Service (Amazon ECS) service.
+    Value: !GetAtt EDHECSPOSClusterStack.Outputs.ECSALB
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSALB'     
+  LaunchConfiguration:
+    Description: Amazon EC2 Auto Scaling launch configuration that can be used by an Auto Scaling group to configure Amazon ECS instances.
+    Value: !GetAtt EDHECSPOSClusterStack.Outputs.LaunchConfiguration
+    Export:
+      Name: !Sub '${AWS::StackName}-LaunchConfiguration'
+  ECSPOSAutoscalinggroup:
+    Description: Auto Scaling group to control how rolling updates are performed when a change has been made to the Auto Scaling group's launch configuration.
+    Value: !GetAtt EDHECSPOSClusterStack.Outputs.ECSPOSAutoscalinggroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSPOSAutoscalinggroup'
+  ECSKTcluster:
+    Description: Name of an ECSKT Cluster.
+    Value: !GetAtt EDHECSKTClusterStack.Outputs.ECSKTcluster
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSKTcluster'
+  ECSKTWEBTargetGroup:
+    Description: An Application Load Balancer target group Amazon Resource Name (ARN) to associate with the Amazon ECSKTWEB service.
+    Value: !GetAtt EDHECSKTClusterStack.Outputs.ECSKTWEBTargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSKTWEBTargetGroup' 
+  ECSKTAPPTargetGroup:
+    Description: An Application Load Balancer target group Amazon Resource Name (ARN) to associate with the Amazon ECSKTAPP service.
+    Value: !GetAtt EDHECSKTClusterStack.Outputs.ECSKTAPPTargetGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSKTAPPTargetGroup'           
+  ECSKTContainerInstance:
+    Description: Auto Scaling launch configuration that can be used by an Auto Scaling group to configure Amazon ECS instances.
+    Value: !GetAtt EDHECSKTClusterStack.Outputs.ECSKTContainerInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSKTContainerInstance' 
+  ECSKTAutoscalinggroup:
+    Description: Auto Scaling group to control how rolling updates are performed when a change has been made to the Auto Scaling group's launch configuration.
+    Value: !GetAtt EDHECSKTClusterStack.Outputs.ECSKTAutoscalinggroup
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSKTAutoscalinggroup'      
+  ECSKTALB:
+    Description: ARN of the load balancer associated with an Amazon ECSKT cluster service.
+    Value: !GetAtt EDHECSKTClusterStack.Outputs.ECSKTALB
+    Export:
+      Name: !Sub '${AWS::StackName}-ECSKTALB'                            

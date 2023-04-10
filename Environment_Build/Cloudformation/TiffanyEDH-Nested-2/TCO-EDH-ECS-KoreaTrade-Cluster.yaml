@@ -1,0 +1,514 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: It Deploys the ECS Cluster Which Includes the ALB,ALBListener,ALBListenerRule,Target groups,AutoScaling,LaunchConfiguration.
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Environment
+        Parameters:
+          - Env
+          - Application
+      - Label:
+          default: Network Configuration
+        Parameters:
+          - VPC
+          - SubnetId          
+      - Label:
+          default: ECS Korea Trade CLUSTER Configuration
+        Parameters:
+            - ECSKTKeyPair
+            - ECSKTClusterName    
+            - ECSKTOptimizedAMI        
+            - ECSKTDesiredCapacity
+            - ECSKTMinInstanceSize
+            - ECSKTMaxInstanceSize
+            - ECSKTInstanceType
+            - ECKTRootVolumeSize
+      - Label:
+          default: AutoScaling Configuration
+        Parameters:
+            - ECSKTAutoscalinggroupname
+      - Label:
+          default: Tagging Configuration
+        Parameters:
+          - EDHTCOTagKey
+          - EDHTCOTagValue             
+Parameters:
+  EDHTCOTagKey:
+    Type: String
+    Description: EDH TCO Tag Key     
+  EDHTCOTagValue:
+    Type: String
+    Description: EDH TCO Tag Value  
+  Application:
+    Description: Tiffany Application Name
+    Type: String
+    Default: EDH    
+  Env:
+    Description: 'The type of environment? ex: Dev/QA/Stg/Prod/Test/NonProd'
+    Type: String
+    MinLength: '1'
+    MaxLength: '20'
+    AllowedValues:
+      - PROD
+      - TEST
+      - STG
+      - DEV
+      - QA
+    Default: STG 
+  ECSKTKeyPair:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the ECS instances.
+    Type: AWS::EC2::KeyPair::KeyName
+  ECSKTClusterName:    
+    Description: Name of the cluster
+    Type: String
+    Default: ecs-prod 
+  ECSKTOptimizedAMI:
+    Description: Provide a Valid ECS-Optimized AMI ID
+    Type: String  
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Select a VPC that allows instances access to the Internet. 
+  SubnetId:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: Select atleast two  in your selected VPC.    
+  ECSKTDesiredCapacity:
+    Type: Number
+    Default: '1'
+    Description: Number of instances to launch in your ECS cluster.
+  ECSKTMinInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.    
+  ECSKTMaxInstanceSize:
+    Type: Number
+    Default: '1'
+    Description: Maximum number of instances that can be launched in your ECS cluster.
+  ECSKTInstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: m4.xlarge
+    ConstraintDescription: Please choose a valid instance type.  
+  ECSKTAutoscalinggroupname:
+    Type: String
+    Default: ecskoreatradetestcontainerinstance
+    Description: Provide a valid AutoScaling Group Name. 
+  ECKTRootVolumeSize:
+    Type: String
+    Description: The size of the volume, in gibibytes (GiBs)
+    Default: 50      
+Mappings:    
+  NameMap: 
+    PROD: 
+      lowecase: "prod"
+    TEST: 
+      lowecase: "test"
+    STG: 
+      lowecase: "stg"
+    DEV: 
+      lowecase: "dev"  
+    QA: 
+      lowecase: "qa" 
+  CamelCaseMap: 
+    PROD: 
+      lowecase: "Prod"
+    TEST: 
+      lowecase: "Test"
+    STG: 
+      lowecase: "Stg"
+    DEV: 
+      lowecase: "Dev"  
+    QA: 
+      lowecase: "Qa"    
+Resources:
+  ECSKTALBSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub KT-${Env}-ALB-SG
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub KT-${Env}-ECS-ALB-SG
+        - Key: Env
+          Value: !Ref Env
+        - Key: Vendor
+          Value: MontyCloud 
+      GroupDescription: >-
+         ECSKTALBSecuritygroup               
+      SecurityGroupIngress:        
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 10.0.0.0/8
+        - IpProtocol: tcp
+          FromPort: '8080'
+          ToPort: '8080'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8090'
+          ToPort: '8090'
+          CidrIp: 172.16.0.0/12
+        - IpProtocol: tcp
+          FromPort: '8090'
+          ToPort: '8090'
+          CidrIp: 10.255.0.0/16
+        - IpProtocol: tcp
+          FromPort: '8090'
+          ToPort: '8090'
+          CidrIp: 10.0.0.0/8
+  ECSKTSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Sub KT-${Env}-ECS-SG
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub KT-${Env}-ECSKT-SG
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+        - Key: Environment
+          Value: !Ref Env
+      GroupDescription: >-
+         ECSKTSecuritygroup               
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '0'
+          ToPort: '65535'
+          SourceSecurityGroupId: !Ref 'ECSKTALBSecurityGroup'                
+  ECSKTCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref ECSKTClusterName          
+  ECSKTALB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: !Join
+        - ''
+        - - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - '-tiffanytradetransactions'
+      Scheme: internal
+      IpAddressType: ipv4
+      Type: application
+      LoadBalancerAttributes:
+      - Key: idle_timeout.timeout_seconds
+        Value: '60'
+      - Key: routing.http2.enabled 
+        Value: true 
+      Subnets: !Ref 'SubnetId'
+      SecurityGroups: [!Ref 'ECSKTALBSecurityGroup']
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-EMR-${Env}
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+        - Key: Environment
+          Value: !Ref Env
+  ECSKTWEBALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: ECSKTServiceRole
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSKTWEBTARGETGROUP'
+      LoadBalancerArn: !Ref 'ECSKTALB'
+      Port: '8080'
+      Protocol: HTTP
+  ECSKTAPPALBListener:  
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: ECSKTServiceRole      
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSKTAPPTARGETGROUP'
+      LoadBalancerArn: !Ref 'ECSKTALB'
+      Port: '8090'
+      Protocol: HTTP      
+  ECSKTWEBALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    DependsOn: ECSKTWEBALBListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSKTWEBTARGETGROUP'
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - '*'
+      ListenerArn: !Ref 'ECSKTWEBALBListener'
+      Priority: 1
+  ECSKTAPPALBListenerRule:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule   
+    DependsOn: ECSKTAPPALBListener
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn: !Ref 'ECSKTAPPTARGETGROUP'
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - '*'
+      ListenerArn: !Ref 'ECSKTAPPALBListener'
+      Priority: 1      
+  ECSKTWEBTARGETGROUP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: ECSKTALB
+    Properties:
+      HealthCheckIntervalSeconds: 300
+      HealthCheckPath: /
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Name: !Join
+        - ''
+        - - 'kt'
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - '-web'
+      Port: 32951
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC       
+      TargetGroupAttributes:
+       - Key: deregistration_delay.timeout_seconds
+         Value: '300'
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-ECSKTWEB-${Env}
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+        - Key: Environment
+          Value: !Ref Env 
+  ECSKTAPPTARGETGROUP:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    DependsOn: ECSKTALB
+    Properties:
+      HealthCheckIntervalSeconds: 300
+      HealthCheckPath: /api/nationality
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Name: !Join
+        - ''
+        - - 'kt'
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - '-app'
+      Port: 32954
+      Protocol: HTTP
+      UnhealthyThresholdCount: 2
+      VpcId: !Ref VPC 
+      TargetGroupAttributes:
+       - Key: deregistration_delay.timeout_seconds
+         Value: '300'
+      Tags:
+        - Key: Name
+          Value: !Sub TCO-ECSKTAPP-${Env}
+        - Key: Application
+          Value: !Ref Application          
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+        - Key: Environment
+          Value: !Ref Env                             
+  ECSKTAutoScalingGroup:
+    DependsOn: ECSKTCluster
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AutoScalingGroupName: !Ref ECSKTAutoscalinggroupname
+      VPCZoneIdentifier: !Ref SubnetId
+      TargetGroupARNs: 
+       - !Ref ECSKTWEBTARGETGROUP
+       - !Ref ECSKTAPPTARGETGROUP
+      LaunchConfigurationName: !Ref ECSKTLaunchConfiguration
+      MinSize: !Ref ECSKTMinInstanceSize
+      MaxSize: !Ref ECSKTMaxInstanceSize
+      DesiredCapacity: !Ref ECSKTDesiredCapacity
+      HealthCheckType: EC2
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-TCO-EDH-ECS-KT
+          PropagateAtLaunch: true
+        - Key: Application
+          Value: !Ref Application   
+          PropagateAtLaunch: true       
+        - Key: !Ref EDHTCOTagKey
+          Value: !Ref EDHTCOTagValue 
+          PropagateAtLaunch: true
+        - Key: Environment
+          Value: !Ref Env
+          PropagateAtLaunch: true        
+  ECSKTLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      KeyName: !Ref ECSKTKeyPair
+      ImageId: !Ref ECSKTOptimizedAMI
+      EbsOptimized: true
+      IamInstanceProfile: !Ref ECSKTInstanceProfile      
+      InstanceMonitoring: true
+      InstanceType: !Ref ECSKTInstanceType
+      AssociatePublicIpAddress: true
+      UserData:
+        "Fn::Base64": !Sub |
+          #!/bin/bash -xe
+          echo ECS_CLUSTER=${ECSKTCluster} >> /etc/ecs/ecs.config
+          echo ECS_BACKEND_HOST= >> /etc/ecs/ecs.config    
+      BlockDeviceMappings:
+        - DeviceName: "/dev/xvdcz"
+          Ebs:
+           VolumeSize: !Ref ECKTRootVolumeSize #'50'
+      SecurityGroups:
+        - !Ref ECSKTSecurityGroup
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              collectd: []
+          commands:
+            01_add_instance_to_cluster:
+              command: !Sub echo ECS_CLUSTER=${ECSKTCluster} >> /etc/ecs/ecs.config
+          files:
+            /etc/cfn/cfn-hup.conf:
+              mode: 000400
+              owner: root
+              group: root
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+            /etc/cfn/hooks.d/cfn-auto-reloader.conf:
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.ECSKTLaunchConfiguration.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --region ${AWS::Region} --stack ${AWS::StackName} --resource ECSKTLaunchConfiguration
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                  - /etc/cfn/cfn-hup.conf
+                  - /etc/cfn/hooks.d/cfn-auto-reloader.conf 
+  ECSKTServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ecs.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      RoleName: !Join
+        - ''
+        - - 'ecsinstanceloadbalancer'
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - 'role'      
+      Policies:
+      - PolicyName: AmazonEC2ContainerServiceforEC2Role
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: 
+              - 'elasticloadbalancing:DeregisterInstancesFromLoadBalancer' 
+              - 'elasticloadbalancing:DeregisterTargets'
+              - 'elasticloadbalancing:Describe*'
+              - 'elasticloadbalancing:RegisterInstancesWithLoadBalancer'
+              - 'elasticloadbalancing:RegisterTargets' 
+              - 'ec2:Describe*' 
+              - 'ec2:AuthorizeSecurityGroupIngress'              
+            Resource: '*'                           
+  ECSKTInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      RoleName: !Join
+        - ''
+        - - 'ecsinstance'
+          - !FindInMap
+            - NameMap
+            - !Ref 'Env'
+            - lowecase
+          - 'role'
+      Policies:
+      - PolicyName: AmazonEC2ContainerServiceforEC2Role
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: 
+              - 'ecs:CreateCluster'
+              - 'ecs:DeregisterContainerInstance'
+              - 'ecs:DiscoverPollEndpoint'
+              - 'ecs:Poll'
+              - 'ecs:RegisterContainerInstance'
+              - 'ecs:StartTelemetrySession'
+              - 'ecs:UpdateContainerInstancesState'
+              - 'ecs:Submit*'
+              - 'ecr:GetAuthorizationToken'
+              - 'ecr:BatchCheckLayerAvailability'
+              - 'ecr:GetDownloadUrlForLayer'
+              - 'ecr:BatchGetImage'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'              
+            Resource: '*'                       
+  ECSKTInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref 'ECSKTInstanceRole']    
+      InstanceProfileName: !Join
+            - ''
+            - - 'ecsinstance'
+              - !FindInMap
+                - NameMap
+                - !Ref 'Env'
+                - lowecase
+              - 'roleprofile'               
+Outputs:
+  ECSKTcluster:
+    Description: Name of an ECSKT Cluster.
+    Value: !Ref 'ECSKTCluster' 
+  ECSKTWEBTargetGroup:
+    Description: An Application Load Balancer target group Amazon Resource Name (ARN) to associate with the Amazon ECSKTWEB service.
+    Value: !Ref ECSKTWEBTARGETGROUP
+  ECSKTAPPTargetGroup:
+    Description: An Application Load Balancer target group Amazon Resource Name (ARN) to associate with the Amazon ECSKTAPP service.
+    Value: !Ref ECSKTAPPTARGETGROUP            
+  ECSKTContainerInstance:
+    Description: Auto Scaling launch configuration that can be used by an Auto Scaling group to configure Amazon ECS instances.
+    Value: !Ref 'ECSKTLaunchConfiguration'
+  ECSKTAutoscalinggroup:
+    Description: Auto Scaling group to control how rolling updates are performed when a change has been made to the Auto Scaling group's launch configuration.
+    Value: !Ref 'ECSKTAutoScalingGroup'      
+  ECSKTALB:
+    Description: ARN of the load balancer associated with an Amazon ECSKT cluster service.
+    Value: !Ref ECSKTALB  
+  EcsIamRoles:
+    Description:  IAM role to enable applications running on an Ec2 Container Instance to create or modify Amazon ECS resources.
+    Value: !Ref ECSKTInstanceRole       

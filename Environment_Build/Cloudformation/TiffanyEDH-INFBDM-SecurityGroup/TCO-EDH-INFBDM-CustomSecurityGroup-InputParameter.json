@@ -1,0 +1,14 @@
+[
+  {
+    "ParameterKey": "Env",
+    "ParameterValue": "STG"
+  },
+  {
+    "ParameterKey": "EDHTCOVPCMasterStack",
+    "ParameterValue": "TiffanyEDHStg"
+  }, 
+  {
+    "ParameterKey": "EDHTCOMasterStack",
+    "ParameterValue": "TiffanyEDHStg-Master-1"
+  }
+]

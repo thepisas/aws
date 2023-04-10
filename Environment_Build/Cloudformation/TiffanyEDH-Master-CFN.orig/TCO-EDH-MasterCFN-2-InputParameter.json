@@ -1,0 +1,210 @@
+[
+  {
+    "ParameterKey": "RedshiftLambdaDDLStack",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "ELSKibannaStack",
+    "ParameterValue": "Yes"
+  }, 
+  {
+    "ParameterKey": "ECSPOSStack",
+    "ParameterValue": "Yes"
+  },
+  {
+    "ParameterKey": "ECSKTStack",
+    "ParameterValue": "Yes"
+  },        
+  {
+    "ParameterKey": "ESParmStrNonDefaultSuperUserName",
+    "ParameterValue": "ElasticSearch_LambdaESUserName_Stg"
+  },
+  {
+    "ParameterKey": "ESParmStrNonDefaultSuperUserPswd",
+    "ParameterValue": "ElasticSearch_LambdaESUserPassword_Stg"
+  },
+  {
+    "ParameterKey": "ESParmStrResetDefaultUserPswd",
+    "ParameterValue": "ElasticSearch_DefaultUserPassword_Stg"
+  },
+  {
+    "ParameterKey": "ESParmStrLDAPBindPswd",
+    "ParameterValue": "ElasticSearch_LDAPBindPassword_Stg"
+  }, 
+  {
+    "ParameterKey": "ESParamStrMasterNodeOnePvtIP",
+    "ParameterValue": "ElasticSearch_MasterNode1_ipaddress"
+  },
+  {
+    "ParameterKey": "ESParamStrMasterNodeTwoPvtIP",
+    "ParameterValue": "ElasticSearch_MasterNode2_ipaddress"
+  },
+  {
+    "ParameterKey": "ESParamStrMasterNodeThreePvtIP",
+    "ParameterValue": "ElasticSearch_MasterNode3_ipaddress"
+  },
+  {
+    "ParameterKey": "ESInstanceVolumeSize",
+    "ParameterValue": "128"
+  },
+  {
+    "ParameterKey": "ESInstanceVolumeType",
+    "ParameterValue": "gp2"
+  }, 
+  {
+    "ParameterKey": "ESUsersList",
+    "ParameterValue": "adatta,csett,skarmaka,droglier,nirchoud,mkundu,negupta,rpraksh,sbanerje,mcuser"
+  },
+  {
+    "ParameterKey": "NodesInCluster",
+    "ParameterValue": "3"
+  },   
+  {
+    "ParameterKey": "LaunchKibanaNodeFlag",
+    "ParameterValue": "Yes"
+  },           
+  {
+    "ParameterKey": "ESAmiID",
+    "ParameterValue": "ami-d59aa3af"
+  },
+  {
+    "ParameterKey": "KibanaInstanceType",
+    "ParameterValue": "m5.xlarge"
+  },
+  {
+    "ParameterKey": "S3EDHESKIBScriptBucketName",
+    "ParameterValue": "tiffany-edh-environment-build-prerequisites/cloudformation/scripts/ConfigurationFiles/ElasticSearch/scripts"
+  },  
+  {
+    "ParameterKey": "ESInstanceType",
+    "ParameterValue": "m5.xlarge"
+  },
+  {
+    "ParameterKey": "ElasticSearchServerName",
+    "ParameterValue": "amzlinelas"
+  },
+  {
+    "ParameterKey": "ESKibanaServerName",
+    "ParameterValue": "amzlinkibs"
+  },
+  {
+    "ParameterKey": "ElasticsearchSnapshotName",
+    "ParameterValue": "snapshot-20180914-000003179"
+  },
+  {
+    "ParameterKey": "MaxS3BatchSize",
+    "ParameterValue": "250"
+  },
+  {
+    "ParameterKey": "EncryptedPasswordParameterStoreName",
+    "ParameterValue": "ElasticSearch_EncryptedLambdaESUserPassword_Stg"
+  },  
+  {
+    "ParameterKey": "LambdaCodeS3Key",
+    "ParameterValue": "cloudformation/scripts/edh-elasticsearch-lambda.zip"
+  },  
+  {
+    "ParameterKey": "ECSPOSClusterName",
+    "ParameterValue": "amzecsrfstg-cluster"
+  },
+  {
+    "ParameterKey": "ECSPOSOptimizedAMIID",
+    "ParameterValue": "ami-28456852"
+  },
+  {
+    "ParameterKey": "ECSPOSDesiredCapacity",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSPOSRootVolumeSize",
+    "ParameterValue": "50"
+  },  
+  {
+    "ParameterKey": "ECSPOSMaxInstanceSize",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSPOSMinInstanceSize",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSPOSInstanceType",
+    "ParameterValue": "m4.large"
+  },
+  {
+    "ParameterKey": "ECSKTClusterName",
+    "ParameterValue": "ecs-stg"
+  },
+  {
+    "ParameterKey": "ECSKTOptimizedAMI",
+    "ParameterValue": "ami-aff65ad2"
+  },
+  {
+    "ParameterKey": "ECSKTDesiredCapacity",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSKTMinInstanceSize",
+    "ParameterValue": "1"
+  },
+  {
+    "ParameterKey": "ECSKTMaxInstanceSize",
+    "ParameterValue": "1"
+  },  
+  {
+    "ParameterKey": "ECSKTInstanceType",
+    "ParameterValue": "m4.xlarge"
+  },  
+  {
+    "ParameterKey": "ECKTRootVolumeSize",
+    "ParameterValue": "50"
+  }, 
+  {
+    "ParameterKey": "RedshiftPasswordValidUntil",
+    "ParameterValue": "10"
+  },   
+  {
+    "ParameterKey": "RedshiftDDLS3Keys",
+    "ParameterValue": "cloudformation/scripts/RedshiftDDLs"
+  },    
+  {
+    "ParameterKey": "RedshiftDeploymentPackageKey",
+    "ParameterValue": "cloudformation/scripts/RedShiftDDLExecutionLambda.zip"
+  },   
+  {
+    "ParameterKey": "S3EDHOracleDDLScriptsBucketName",
+    "ParameterValue": "tiffany-edh-environment-build-prerequisites/cloudformation/scripts/OracleRDS_Configurations"
+  },  
+  {
+    "ParameterKey": "OracleDDLS3Key",
+    "ParameterValue": "EDHOracleRDS_DDL.zip"
+  },    
+  {
+    "ParameterKey": "ECSPOSAutoscalinggroupname",
+    "ParameterValue": "ecsposstgcontainerinstance"
+  },  
+  {
+    "ParameterKey": "ECSKTAutoscalinggroupname",
+    "ParameterValue": "ecskoreatradestgcontainerinstance"
+  }, 
+  {
+    "ParameterKey": "LatestAmiId",
+    "ParameterValue": "/aws/service/ami-amazon-linux-latest/amzn-ami-hvm-x86_64-gp2"
+  },    
+  {
+    "ParameterKey": "CFTS3BucketName",
+    "ParameterValue": "tiffany-edh-environment-build-prerequisites"
+  },  
+  {
+    "ParameterKey": "CFTS3KeyPrefix",
+    "ParameterValue": "cloudformation/TiffanyEDH-Nested-2"
+  },
+  {
+    "ParameterKey": "EDHTCOMasterStack",
+    "ParameterValue": "TiffanyEDHStg-Master-1"
+  },  
+  {
+    "ParameterKey": "EDHTCOVPCMasterStack",
+    "ParameterValue": "TiffanyEDHStg"
+  }  
+]
