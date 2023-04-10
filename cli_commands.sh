@@ -38,3 +38,13 @@ aws iam create-account-alias --account-alias tco-nonproduction
 aws ec2 describe-security-groups --filters Name=ip-permission.group-id,Values=*sg-024fb892a45248f98* --group-ids sg-6bc22d14
 aws ec2 describe-security-groups --filters Name=ip-permission.group-id,Values=*sg-024fb892a45248f98* --group-ids sg-6bc22d14 --output table 
 
+#S3
+#to copy bdm software from one of the bdm instances to S3 . It took about 75 seconds to copy the 8.1 G file below
+[apathros@amzbdmrfqa01 software]$ date; aws s3 cp /app/software/1011_Server_Installer_linux-x64.tar.gz s3://amzs3edhcloudformationtemplate/bdm/software ; date  | tee ~apathros/s3_copy.out
+aws s3 cp /app/software/Tiffany_and_Company_MultiOS_BDM_Advanced_v1011_0129427_172729.key s3://amzs3edhcloudformationtemplate/bdm/software/license/nonprod/
+aws s3 cp /app/ctmagent.tgz s3://amzs3edhcloudformationtemplate/controlm/software/
+aws s3 cp s3://amzs3edhcloudformationtemplate/controlm/software/ctmagent.tgz /app/
+date; aws s3 cp /app/software/1011_Server_Installer_linux-x64.tar.gz s3://tiffany-edh-environment-build-prerequisites/bdm/software ; date  
+
+aws ssm put-parameter --name "KT_RDSStgPassword" --type "SecureString" --value "<EnterPassword>" --key-id "cdfba6b2-28bb-46c7-8e93-6ef9966da7e2" --profile "<EnterProfile>" --region "us-east-1"
+
