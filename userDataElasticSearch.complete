@@ -1,0 +1,120 @@
+#!/bin/bash -xe
+exec > >(tee /var/tmp/userdata.log|logger -t userdata ) 2>&1
+
+#create elastic search user
+groupadd -g 598 elasticsearch
+useradd -u 997 -g 598 -c "elasticsearch user" -s /sbin/nologin -M elasticsearch
+chage -I -1 -m 0 -M 99999 -E -1 elasticsearch
+
+#create users with root privs
+for i in apathros ; do
+  useradd -m -G ssh_access $i
+  user_created=$(id -u $i > /dev/null 2>&1; echo $?)
+	 if [ ${user_created} -eq 0 ]; then
+		 mkdir -p /home/$i/.ssh
+		 touch /home/$i/.ssh/authorized_keys
+		 chown -R $i:$i /home/$i/.ssh
+		 chmod 700 /home/$i/.ssh
+		 chmod 600 /home/$i/.ssh/authorized_keys
+		 #echo "$i ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+		 echo "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs4BND/xthEk7nZdCo6Ksj6eoOs9TW8HUQIz5kkLEvPp14Tn72QPbYOH0Gynv5h1UFEjYHym81ZyOdnAytBF0U3PIfXhEIdsnx7z7qYQUgksu7D9wdkVobDsQcqtXhDlzIZri+pqubqDMWWM5kjVJldhxu3U7mxOM1QG1h9h2Fg2yxV31ub0d6gGuSXJFlX791QzsE8aROe0QXpW8y/BRPwYniHJHfPScl6Fit3R8IfjQV8FEYnfpxcqafR3RlH/d7TxUEtNPh2i7dE19M4CERx0C59Ktv9m3rX6+RKmAfd30OjL6fq00Ly3zpA/QudKZfN5p3wQEfZA89ZCz5Z849 imported-openssh-key" >> /home/$i/.ssh/authorized_keys
+		 chage -I -1 -m 0 -M 99999 -E -1 $i
+	 fi
+done
+
+
+ADMINS=apathros
+
+#users with temporary root privs during build 
+for i in adatta viksingh ; do
+  useradd -m -G ssh_access $i
+	ADMINS="$ADMINS,$i"
+done
+
+echo -e "\nUser_Alias ADMINS=$ADMINS" >> /etc/sudoers
+echo -e "\nADMINS ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+#set timezone
+timedatectl set-timezone America/New_York
+
+yum update -y
+
+yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+yum install zip unzip bind-utils traceroute lvm2 wget -y
+yum install nvme-cli -y
+
+#install SSM Agent
+cd /tmp
+yum install -y https://s3.amazonaws.com/ec2-downloads-windows/SSMAgent/latest/linux_amd64/amazon-ssm-agent.rpm
+systemctl enable amazon-ssm-agent
+systemctl start amazon-ssm-agent
+
+#install AWS CLI
+cd /tmp
+curl "https://s3.amazonaws.com/aws-cli/awscli-bundle.zip" -o "awscli-bundle.zip"
+unzip awscli-bundle.zip
+./awscli-bundle/install -i /usr/local/aws -b /usr/local/bin/aws
+rm ./awscli-bundle.zip
+rm -rf ./awscli-bundle
+
+#install cloudwatch monitoring scripts
+yum install perl-Switch perl-DateTime perl-Sys-Syslog perl-LWP-Protocol-https perl-Digest-SHA --enablerepo="rhui-REGION-rhel-server-optional" -y
+cd /usr/local/bin ;curl https://aws-cloudwatch.s3.amazonaws.com/downloads/CloudWatchMonitoringScripts-1.2.2.zip -O ; unzip CloudWatchMonitoringScripts-1.2.2.zip && rm CloudWatchMonitoringScripts-1.2.2.zip && cd aws-scripts-mon
+
+#install packages for AD
+yum install -y sssd realmd krb5-workstation oddjob oddjob-mkhomedir samba-common-tools
+
+#set hostname
+#for some reason, even though these commands seem to get executed, unless I explicitly run hostnamectl set-hostname ${host_name} again , the hostname change do not seem to take effect.
+region="us-east-1"
+ec2_instance_id=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+host_name=$(/usr/local/bin/aws ec2 --region ${region}  describe-tags --filters Name=resource-id,Values=${ec2_instance_id} Name=key,Values=Name --query Tags[].Value --output text)
+hostnamectl set-hostname ${host_name}
+
+# Change Hostname
+#/usr/local/bin/aws ec2 --region us-east-1  describe-tags --filters Name=resource-id,Values=`wget -q -O - http://169.254.169.254/latest/meta-data/instance-id` Name=key,Values=Name --query Tags[].Value --output text >> /tmp/newhostname.txt
+#hostnamectl set-hostname `cat /tmp/newhostname.txt`
+
+hostnamectl status
+
+#To persist the change
+echo "preserve_hostname: true" >> /etc/cloud/cloud.cfg
+
+# *********NOTE: Enable password based Authentication
+#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using the following command: systemctl restart sshd
+
+#create service account and group
+groupadd -g 3000 svc_esdev
+useradd -u 3000 -g 3000 svc_esdev
+chage -I -1 -m 0 -M 99999 -E -1 svc_esdev
+
+echo -e "\n# Access to svc_esdev,elasticsearch accounts" >> /etc/sudoers
+echo -e "apathros,adatta,viksingh,nirchoud  ALL=(svc_esdev,elasticsearch)  ALL" >> /etc/sudoers
+
+echo -e "\n# Access to administer elasticsearch service" >> /etc/sudoers
+echo -e "apathros,adatta,viksingh,nirchoud  ALL=(root) /usr/bin/systemctl daemon-reload, /usr/bin/systemctl start elasticsearch.service, /usr/bin/systemctl stop elasticsearch.service,  /usr/bin/systemctl status elasticsearch.service, /usr/share/elasticsearch/bin/elasticsearch-plugin, /usr/share/elasticsearch/bin/x-pack/certgen" >> /etc/sudoers
+
+#operations pertaining to the /app filesystem 
+mkdir /app
+
+app_device=`lsblk | awk '{print $1}'| tail -1`
+
+if [ "${app_device}" = "nvme1n1" ]; then
+	mkfs.xfs /dev/${app_device}
+	xfs_admin -L "elaq01-app" /dev/${app_device}
+	immutable=`lsattr /etc/fstab | awk -F- '{print $5}'`
+	if [ "$immutable" = "i" ]; then chattr -i /etc/fstab ; fi
+	lsattr /etc/fstab
+	echo "LABEL=elaq01-app /app xfs noatime,rw 1 2" >> /etc/fstab
+	mount -a
+	chown -R elasticsearch.svc_esdev /app
+	ls -ld /app
+	df -h /app
+else
+	echo -e "The app device/volume is ${app_device} when the expected value was nvme1n1. So the filesystem and label were not created on it."
+fi
+
+# *********NOTE:Enable password based Authentication***********
+#update PasswordAuthentication from No to Yes in /etc/ssh/sshd_config and then restart sshd using systemctl restart sshd
+
+reboot
